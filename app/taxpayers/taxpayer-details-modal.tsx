@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import Image from "next/image";
 
 export type TaxpayerModalNotice = {
   number: string;
@@ -316,10 +317,13 @@ export function TaxpayerDetailsModal({
                           onClick={() => setActivePhoto(url)}
                           aria-label={`Voir photo ${index + 1}`}
                         >
-                          <img
+                          <Image
                             src={url}
                             alt={`Photo ${index + 1} de ${taxpayer.name}`}
+                            width={320}
+                            height={160}
                             className="h-40 w-full rounded-2xl object-cover shadow-sm transition duration-300 group-hover:scale-105"
+                            unoptimized
                           />
                           <div className="absolute inset-0 bg-slate-900/0 transition duration-300 group-hover:bg-slate-900/20" />
                           <div className="absolute bottom-2 right-2 rounded-full bg-white/90 px-2 py-1 text-xs text-slate-700">
@@ -350,10 +354,13 @@ export function TaxpayerDetailsModal({
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 py-6">
           <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md" onClick={() => setActivePhoto(null)} />
           <div className="relative z-10 w-full max-w-5xl">
-            <img
+            <Image
               src={activePhoto}
               alt={`Photo de ${taxpayer.name}`}
+              width={1200}
+              height={800}
               className="max-h-[85vh] w-full rounded-3xl object-contain shadow-2xl"
+              unoptimized
             />
             <Button
               type="button"

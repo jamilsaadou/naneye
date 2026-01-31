@@ -107,7 +107,7 @@ function buildPieSegments(values: Array<{ value: number; color: string }>) {
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams?: ReportsSearchParams | Promise<ReportsSearchParams>;
+  searchParams?: Promise<ReportsSearchParams>;
 }) {
   const user = await getUserWithCommune();
   if (!user) {

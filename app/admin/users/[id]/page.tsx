@@ -15,9 +15,10 @@ const roles = [
   { value: "AUDITEUR", label: "Auditeur" },
 ] as const;
 
-export default async function AdminUserDetailsPage({ params }: { params: { id: string } }) {
+export default async function AdminUserDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const [user, communes, supervisors] = await Promise.all([
-    prisma.user.findUnique({ where: { id: params.id }, include: { commune: true } }),
+    prisma.user.findUnique({ where: { id }, include: { commune: true } }),
     prisma.commune.findMany({ orderBy: { name: "asc" } }),
     prisma.user.findMany({
       where: { role: { in: ["SUPER_ADMIN", "ADMIN"] } },

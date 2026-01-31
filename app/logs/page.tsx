@@ -106,14 +106,15 @@ function describeLog(log: { action: string; after: Prisma.JsonValue | null }) {
   return "-";
 }
 
-export default async function LogsPage({ searchParams }: { searchParams?: SearchParams }) {
-  const actionParam = getParam(searchParams, "action") ?? "all";
-  const actorParam = getParam(searchParams, "actorId") ?? "all";
-  const pageSizeParam = Number.parseInt(getParam(searchParams, "pageSize") ?? "10", 10);
+export default async function LogsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const searchParamsData = await searchParams;
+  const actionParam = getParam(searchParamsData, "action") ?? "all";
+  const actorParam = getParam(searchParamsData, "actorId") ?? "all";
+  const pageSizeParam = Number.parseInt(getParam(searchParamsData, "pageSize") ?? "10", 10);
   const pageSize = [10, 50, 100].includes(pageSizeParam) ? pageSizeParam : 10;
-  const page = Math.max(1, Number.parseInt(getParam(searchParams, "page") ?? "1", 10) || 1);
-  const fromDate = parseDate(getParam(searchParams, "from"));
-  const toDate = parseDate(getParam(searchParams, "to"), true);
+  const page = Math.max(1, Number.parseInt(getParam(searchParamsData, "page") ?? "1", 10) || 1);
+  const fromDate = parseDate(getParam(searchParamsData, "from"));
+  const toDate = parseDate(getParam(searchParamsData, "to"), true);
 
   const createdAtFilter: Prisma.DateTimeFilter | undefined =
     fromDate || toDate
@@ -154,13 +155,13 @@ export default async function LogsPage({ searchParams }: { searchParams?: Search
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const params = new URLSearchParams();
-  Object.entries(searchParams ?? {}).forEach(([key, value]) => {
+  const queryParams = new URLSearchParams();
+  Object.entries(searchParamsData ?? {}).forEach(([key, value]) => {
     const entry = Array.isArray(value) ? value[0] : value;
-    if (entry) params.set(key, entry);
+    if (entry) queryParams.set(key, entry);
   });
   const pageHref = (nextPage: number) => {
-    const next = new URLSearchParams(params);
+    const next = new URLSearchParams(queryParams);
     next.set("page", String(nextPage));
     return `?${next.toString()}`;
   };
@@ -207,13 +208,13 @@ export default async function LogsPage({ searchParams }: { searchParams?: Search
             <input
               name="from"
               type="date"
-              defaultValue={getParam(searchParams, "from") ?? ""}
+              defaultValue={getParam(searchParamsData, "from") ?? ""}
               className="h-9 rounded-md border border-border px-3 text-sm"
             />
             <input
               name="to"
               type="date"
-              defaultValue={getParam(searchParams, "to") ?? ""}
+              defaultValue={getParam(searchParamsData, "to") ?? ""}
               className="h-9 rounded-md border border-border px-3 text-sm"
             />
             <select
@@ -231,7 +232,7 @@ export default async function LogsPage({ searchParams }: { searchParams?: Search
                 <a href="/logs">Reinitialiser</a>
               </Button>
               <Button asChild variant="outline">
-                <a href={`/logs/export?${params.toString()}`}>Exporter</a>
+                <a href={`/logs/export?${queryParams.toString()}`}>Exporter</a>
               </Button>
             </div>
           </form>

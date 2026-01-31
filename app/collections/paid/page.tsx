@@ -14,13 +14,18 @@ function formatMoney(value: number) {
   return `${formatNumber(value)} FCFA`;
 }
 
-export default async function CollectionsPaidPage({ searchParams }: { searchParams?: { groupId?: string } }) {
+export default async function CollectionsPaidPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ groupId?: string }>;
+}) {
   const user = await getUserWithCommune();
   if (!user) {
     return <div className="text-sm text-muted-foreground">Acces refuse.</div>;
   }
   const scopedCommune = user.role === "SUPER_ADMIN" ? null : user.commune?.name ?? null;
-  const groupId = searchParams?.groupId ?? "";
+  const params = await searchParams;
+  const groupId = params?.groupId ?? "";
 
   const groups = await prisma.taxpayerGroup.findMany({
     where: scopedCommune

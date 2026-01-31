@@ -39,7 +39,7 @@ function parseDate(value: string | undefined, endOfDay = false) {
   return date;
 }
 
-export default async function ReductionApprovalsPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function ReductionApprovalsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const user = await getUserWithCommune();
   if (!user) {
     return <div className="text-sm text-muted-foreground">Acces refuse.</div>;
@@ -47,15 +47,17 @@ export default async function ReductionApprovalsPage({ searchParams }: { searchP
 
   const scopedCommune = user.role === "SUPER_ADMIN" ? null : user.commune?.name ?? null;
 
-  const statusParam = (getParam(searchParams, "status") ?? "pending").toLowerCase();
-  const pageSizeParam = Number.parseInt(getParam(searchParams, "pageSize") ?? "10", 10);
+  const resolvedParams = await searchParams;
+
+  const statusParam = (getParam(resolvedParams, "status") ?? "pending").toLowerCase();
+  const pageSizeParam = Number.parseInt(getParam(resolvedParams, "pageSize") ?? "10", 10);
   const pageSize = [10, 50, 100].includes(pageSizeParam) ? pageSizeParam : 10;
-  const page = Math.max(1, Number.parseInt(getParam(searchParams, "page") ?? "1", 10) || 1);
-  const fromDate = parseDate(getParam(searchParams, "from"));
-  const toDate = parseDate(getParam(searchParams, "to"), true);
-  const taxpayerCode = getParam(searchParams, "taxpayerCode")?.trim();
-  const taxpayerPhone = getParam(searchParams, "taxpayerPhone")?.trim();
-  const noticeNumber = getParam(searchParams, "noticeNumber")?.trim();
+  const page = Math.max(1, Number.parseInt(getParam(resolvedParams, "page") ?? "1", 10) || 1);
+  const fromDate = parseDate(getParam(resolvedParams, "from"));
+  const toDate = parseDate(getParam(resolvedParams, "to"), true);
+  const taxpayerCode = getParam(resolvedParams, "taxpayerCode")?.trim();
+  const taxpayerPhone = getParam(resolvedParams, "taxpayerPhone")?.trim();
+  const noticeNumber = getParam(resolvedParams, "noticeNumber")?.trim();
 
   const createdAtFilter: Prisma.DateTimeFilter | undefined =
     fromDate || toDate
@@ -131,7 +133,7 @@ export default async function ReductionApprovalsPage({ searchParams }: { searchP
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const params = new URLSearchParams();
-  Object.entries(searchParams ?? {}).forEach(([key, value]) => {
+  Object.entries(resolvedParams ?? {}).forEach(([key, value]) => {
     const entry = Array.isArray(value) ? value[0] : value;
     if (entry) params.set(key, entry);
   });
@@ -192,13 +194,13 @@ export default async function ReductionApprovalsPage({ searchParams }: { searchP
             <input
               name="from"
               type="date"
-              defaultValue={getParam(searchParams, "from") ?? ""}
+              defaultValue={getParam(resolvedParams, "from") ?? ""}
               className="h-9 rounded-md border border-border px-3 text-sm"
             />
             <input
               name="to"
               type="date"
-              defaultValue={getParam(searchParams, "to") ?? ""}
+              defaultValue={getParam(resolvedParams, "to") ?? ""}
               className="h-9 rounded-md border border-border px-3 text-sm"
             />
             <select

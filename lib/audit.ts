@@ -20,8 +20,8 @@ export async function logAudit(payload: AuditPayload) {
       action: payload.action,
       entityType: payload.entityType,
       entityId: payload.entityId,
-      before: payload.before ?? null,
-      after: payload.after ?? null,
+      before: payload.before ?? undefined,
+      after: payload.after ?? undefined,
     },
   });
 }

@@ -152,7 +152,7 @@ export async function createTaxpayer(formData: FormData) {
       data: measures.map((entry) => ({
         taxpayerId: created.id,
         taxId: entry.taxId,
-        quantity: entry.quantity,
+        quantity: Number(entry.quantity),
       })),
     });
   }

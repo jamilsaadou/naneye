@@ -1,4 +1,5 @@
 import { AppSetting, Notice, NoticeLine, Taxpayer } from "@prisma/client";
+import Image from "next/image";
 
 function formatNumber(value: number) {
   const formatted = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(value);
@@ -20,11 +21,16 @@ function formatTime(value: Date) {
 function renderTemplateImage(value: string | null, heightMm: number) {
   if (!value) return null;
   return (
-    <img
-      src={value}
-      alt="Template"
-      style={{ height: `${heightMm}mm`, width: "100%", objectFit: "contain" }}
-    />
+    <div className="relative w-full" style={{ height: `${heightMm}mm` }}>
+      <Image
+        src={value}
+        alt="Template"
+        fill
+        sizes="100vw"
+        style={{ objectFit: "contain" }}
+        unoptimized
+      />
+    </div>
   );
 }
 
@@ -67,7 +73,14 @@ export function AssessmentView({
             <div className="flex items-center justify-between gap-6 px-8 py-4 text-sm">
               <div className="flex items-center gap-4">
                 {settings?.municipalityLogo ? (
-                  <img src={settings.municipalityLogo} alt="Logo" className="h-16 w-16 object-contain" />
+                  <Image
+                    src={settings.municipalityLogo}
+                    alt="Logo"
+                    width={64}
+                    height={64}
+                    className="h-16 w-16 object-contain"
+                    unoptimized
+                  />
                 ) : null}
                 <div className="text-xs font-semibold uppercase text-slate-600">Republique du Niger</div>
               </div>
@@ -76,7 +89,14 @@ export function AssessmentView({
                 <div className="text-xs font-semibold uppercase text-emerald-800">Ville de {taxpayer.commune}</div>
               </div>
               {settings?.municipalityLogo ? (
-                <img src={settings.municipalityLogo} alt="Logo" className="h-16 w-16 object-contain" />
+                <Image
+                  src={settings.municipalityLogo}
+                  alt="Logo"
+                  width={64}
+                  height={64}
+                  className="h-16 w-16 object-contain"
+                  unoptimized
+                />
               ) : (
                 <div className="h-16 w-16" />
               )}
@@ -165,7 +185,7 @@ export function AssessmentView({
 
         <div className="assessment-bottom">
           <div className="mt-6 border-t border-slate-200 px-8 py-4 text-xs">
-            <div className="mx-auto grid w-[105mm] grid-cols-[1fr_14mm] items-center gap-[2mm]">
+            <div className="mx-auto grid w-[100mm] grid-cols-[1fr_12mm] items-center gap-[1.5mm]">
               <div className="min-w-0 space-y-1">
                 <div>Numero d&apos;avis d&apos;imposition : {notice.number}</div>
                 <div>Date de generation : {formatDate(notice.createdAt)}</div>
@@ -174,7 +194,7 @@ export function AssessmentView({
                 <div className="text-[10px] text-slate-500">Version digitale via QR.</div>
               </div>
               <div
-                className="qr-box h-[14mm] w-[14mm] justify-self-start overflow-hidden rounded border border-slate-200 bg-white p-[0.7mm]"
+                className="qr-box h-[12mm] w-[12mm] justify-self-start overflow-hidden rounded border border-slate-200 bg-white p-[0.5mm]"
                 dangerouslySetInnerHTML={{ __html: qrSvg }}
               />
             </div>

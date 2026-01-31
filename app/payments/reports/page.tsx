@@ -27,14 +27,14 @@ function parseRange(params: ReportsSearchParams) {
 export default async function PaymentsReportsPage({
   searchParams,
 }: {
-  searchParams?: ReportsSearchParams | Promise<ReportsSearchParams>;
+  searchParams?: Promise<ReportsSearchParams>;
 }) {
   const user = await getUserWithCommune();
   if (!user) {
     return <div className="text-sm text-muted-foreground">Acces refuse.</div>;
   }
   const scopedCommune = user.role === "SUPER_ADMIN" ? null : user.commune?.name ?? null;
-  const params = (await Promise.resolve(searchParams)) ?? {};
+  const params = (await searchParams) ?? {};
   const range = parseRange(params);
   const paidAtFilter =
     range.start || range.end

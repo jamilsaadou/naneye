@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import Image from "next/image";
 import { ActionForm } from "@/components/ui/action-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,11 +11,16 @@ function renderTemplate(value: string | null, heightMm: number) {
     return <div className="text-xs text-slate-400 italic">Aucune image definie</div>;
   }
   return (
-    <img
-      src={value}
-      alt="Template"
-      style={{ height: `${heightMm}mm`, width: "100%", objectFit: "contain" }}
-    />
+    <div className="relative w-full" style={{ height: `${heightMm}mm` }}>
+      <Image
+        src={value}
+        alt="Template"
+        fill
+        sizes="100vw"
+        style={{ objectFit: "contain" }}
+        unoptimized
+      />
+    </div>
   );
 }
 

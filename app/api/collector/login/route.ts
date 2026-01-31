@@ -43,7 +43,7 @@ export async function POST(request: Request) {
                 code: payload.code ?? null,
                 hasPassword: Boolean(payload.password),
               }
-            : null,
+            : undefined,
           responsePayload: { ok: false, message: "Données invalides" },
         },
       });

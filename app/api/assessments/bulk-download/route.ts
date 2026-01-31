@@ -109,7 +109,7 @@ export async function GET(request: Request) {
   archive.pipe(stream);
 
   const filename = sanitizeFilename(`avis-imposition-${year}.zip`);
-  const response = new Response(Readable.toWeb(stream), {
+  const response = new Response(Readable.toWeb(stream) as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${filename}"`,

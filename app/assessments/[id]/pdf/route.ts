@@ -29,7 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     await context.close();
     await browser.close();
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="avis-imposition-${id}.pdf"`,

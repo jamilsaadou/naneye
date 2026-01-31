@@ -41,9 +41,9 @@ type DashboardSearchParams = {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams?: DashboardSearchParams | Promise<DashboardSearchParams>;
+  searchParams?: Promise<DashboardSearchParams>;
 }) {
-  const params = (await Promise.resolve(searchParams)) ?? {};
+  const params = (await searchParams) ?? {};
   const currentYear = new Date().getFullYear();
   const year = Number.parseInt(params.year ?? "", 10);
   const selectedYear = Number.isNaN(year) ? currentYear : year;

@@ -4,6 +4,7 @@ import { IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { getUserWithRole } from "@/lib/auth";
 import { MODULE_IDS } from "@/lib/modules";
 import { prisma } from "@/lib/prisma";
@@ -48,10 +49,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   </div>
                   {settings?.municipalityLogo ? (
                     <div className="mt-4 flex items-center justify-center">
-                      <img
+                      <Image
                         src={settings.municipalityLogo}
                         alt="Logo commune"
+                        width={160}
+                        height={80}
                         className="h-20 w-auto rounded-md"
+                        unoptimized
                       />
                     </div>
                   ) : null}
@@ -151,10 +155,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   </div>
                   {settings?.municipalityLogo ? (
                     <div className="mt-4 flex items-center justify-center">
-                      <img
+                      <Image
                         src={settings.municipalityLogo}
                         alt="Logo commune"
+                        width={192}
+                        height={96}
                         className="h-24 w-auto rounded-md"
+                        unoptimized
                       />
                     </div>
                   ) : null}

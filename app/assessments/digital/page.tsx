@@ -6,9 +6,10 @@ import { AssessmentView } from "@/app/assessments/components/assessment-view";
 export default async function AssessmentDigitalPage({
   searchParams,
 }: {
-  searchParams?: { token?: string };
+  searchParams?: Promise<{ token?: string }>;
 }) {
-  const token = searchParams?.token ?? "";
+  const params = await searchParams;
+  const token = params?.token ?? "";
   const noticeId = token ? decryptAssessmentToken(token) : null;
 
   if (!noticeId) {

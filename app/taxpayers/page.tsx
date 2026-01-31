@@ -181,7 +181,7 @@ type TaxpayerWithNotices = {
 export default async function TaxpayersPage({
   searchParams,
 }: {
-  searchParams?: SearchParams | Promise<SearchParams>;
+  searchParams?: Promise<SearchParams>;
 }) {
   const [session, user] = await Promise.all([getSession(), getUserWithCommune()]);
   const canDeleteTaxpayer = session?.role === "SUPER_ADMIN";

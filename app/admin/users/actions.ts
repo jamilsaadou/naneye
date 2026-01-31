@@ -78,7 +78,7 @@ export async function createUser(formData: FormData) {
       name: parsed.data.name ?? null,
       role: parsed.data.role,
       passwordHash,
-      enabledModules: MODULE_IDS,
+      enabledModules: [...MODULE_IDS],
       communeId: parsed.data.communeId,
       supervisorId: parsed.data.supervisorId,
     },
@@ -96,7 +96,7 @@ export async function updateUser(formData: FormData) {
   const modules = formData
     .getAll("modules")
     .map((value) => String(value))
-    .filter((value) => MODULE_IDS.includes(value));
+    .filter((value): value is typeof MODULE_IDS[number] => MODULE_IDS.includes(value as typeof MODULE_IDS[number]));
   const parsed = updateUserSchema.safeParse({
     email: raw.email ?? "",
     name: raw.name || null,

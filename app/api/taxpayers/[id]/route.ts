@@ -22,15 +22,17 @@ const taxpayerSchema = z.object({
   startedAt: z.string().optional().nullable(),
 });
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
-  const taxpayer = await prisma.taxpayer.findUnique({ where: { id: params.id } });
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const taxpayer = await prisma.taxpayer.findUnique({ where: { id } });
   if (!taxpayer) {
     return NextResponse.json({ message: "Introuvable" }, { status: 404 });
   }
   return NextResponse.json(taxpayer);
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     await assertCsrfHeader(request);
   } catch (error) {
@@ -57,7 +59,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 
   const taxpayer = await prisma.taxpayer.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       name: parsed.data.name,
       category: parsed.data.category,
@@ -79,7 +81,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   return NextResponse.json(taxpayer);
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   try {
     await assertCsrfHeader(request);
   } catch (error) {
@@ -87,7 +90,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     return NextResponse.json({ message }, { status: 403 });
   }
   const taxpayer = await prisma.taxpayer.update({
-    where: { id: params.id },
+    where: { id },
     data: { status: "ARCHIVED" },
   });
 

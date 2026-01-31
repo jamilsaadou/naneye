@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getUserWithCommune } from "@/lib/auth";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ManualPaymentForm } from "./manual-payment-form";
@@ -14,12 +15,14 @@ function formatMoney(value: number) {
   return `${formatNumber(value)} FCFA`;
 }
 
-export default async function TaxpayerPaymentsPage({ params }: { params: { id: string } }) {
+export default async function TaxpayerPaymentsPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getUserWithCommune();
   const scopedCommune = user?.role === "SUPER_ADMIN" ? null : user?.commune?.name ?? null;
 
+  const resolvedParams = await params;
+
   const taxpayer = await prisma.taxpayer.findUnique({
-    where: { id: params.id },
+    where: { id: resolvedParams.id },
   });
 
   if (!taxpayer) {
@@ -107,7 +110,14 @@ export default async function TaxpayerPaymentsPage({ params }: { params: { id: s
                         rel="noreferrer"
                         className="inline-flex items-center gap-2 text-xs text-emerald-700 hover:underline"
                       >
-                        <img src={payment.proofUrl} alt="Preuve" className="h-8 w-8 rounded object-cover" />
+                        <Image
+                          src={payment.proofUrl}
+                          alt="Preuve"
+                          width={32}
+                          height={32}
+                          className="h-8 w-8 rounded object-cover"
+                          unoptimized
+                        />
                         Voir
                       </a>
                     ) : (

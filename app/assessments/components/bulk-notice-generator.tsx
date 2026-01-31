@@ -262,7 +262,7 @@ export function BulkNoticeGenerator({
         }
       }
 
-      const blob = new Blob(chunks, { type: contentType });
+      const blob = new Blob(chunks as BlobPart[], { type: contentType });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;

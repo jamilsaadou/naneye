@@ -1,6 +1,11 @@
 import { PaymentFlow } from "./payment-flow";
 
-export default function PaymentsPage({ searchParams }: { searchParams?: { code?: string; notice?: string } }) {
+export default async function PaymentsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ code?: string; notice?: string }>;
+}) {
+  const params = await searchParams;
   return (
     <div className="space-y-6">
       <div>
@@ -9,7 +14,7 @@ export default function PaymentsPage({ searchParams }: { searchParams?: { code?:
           Encaisser un paiement a partir du code contribuable et du numero d&apos;avis.
         </p>
       </div>
-      <PaymentFlow defaultCode={searchParams?.code ?? ""} defaultNotice={searchParams?.notice ?? ""} />
+      <PaymentFlow defaultCode={params?.code ?? ""} defaultNotice={params?.notice ?? ""} />
     </div>
   );
 }

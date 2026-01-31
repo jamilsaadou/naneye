@@ -16,4 +16,4 @@ export const MODULES = [
 
 export type ModuleId = (typeof MODULES)[number]["id"];
 
-export const MODULE_IDS = MODULES.map((module) => module.id);
+export const MODULE_IDS: readonly ModuleId[] = MODULES.map((module) => module.id);

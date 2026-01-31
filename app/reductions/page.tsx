@@ -42,22 +42,24 @@ function parseDate(value: string | undefined, endOfDay = false) {
   return date;
 }
 
-export default async function ReductionsPage({ searchParams }: { searchParams?: SearchParams }) {
+export default async function ReductionsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const user = await getUserWithCommune();
   if (!user) {
     return <div className="text-sm text-muted-foreground">Acces refuse.</div>;
   }
   const requiresApproval = Boolean(user.supervisorId);
 
-  const statusParam = (getParam(searchParams, "status") ?? "all").toLowerCase();
-  const pageSizeParam = Number.parseInt(getParam(searchParams, "pageSize") ?? "10", 10);
+  const resolvedParams = await searchParams;
+
+  const statusParam = (getParam(resolvedParams, "status") ?? "all").toLowerCase();
+  const pageSizeParam = Number.parseInt(getParam(resolvedParams, "pageSize") ?? "10", 10);
   const pageSize = [10, 50, 100].includes(pageSizeParam) ? pageSizeParam : 10;
-  const page = Math.max(1, Number.parseInt(getParam(searchParams, "page") ?? "1", 10) || 1);
-  const fromDate = parseDate(getParam(searchParams, "from"));
-  const toDate = parseDate(getParam(searchParams, "to"), true);
-  const taxpayerCode = getParam(searchParams, "taxpayerCode")?.trim();
-  const taxpayerPhone = getParam(searchParams, "taxpayerPhone")?.trim();
-  const noticeNumber = getParam(searchParams, "noticeNumber")?.trim();
+  const page = Math.max(1, Number.parseInt(getParam(resolvedParams, "page") ?? "1", 10) || 1);
+  const fromDate = parseDate(getParam(resolvedParams, "from"));
+  const toDate = parseDate(getParam(resolvedParams, "to"), true);
+  const taxpayerCode = getParam(resolvedParams, "taxpayerCode")?.trim();
+  const taxpayerPhone = getParam(resolvedParams, "taxpayerPhone")?.trim();
+  const noticeNumber = getParam(resolvedParams, "noticeNumber")?.trim();
 
   const createdAtFilter: Prisma.DateTimeFilter | undefined =
     fromDate || toDate
@@ -117,7 +119,7 @@ export default async function ReductionsPage({ searchParams }: { searchParams?: 
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const params = new URLSearchParams();
-  Object.entries(searchParams ?? {}).forEach(([key, value]) => {
+  Object.entries(resolvedParams ?? {}).forEach(([key, value]) => {
     const entry = Array.isArray(value) ? value[0] : value;
     if (entry) params.set(key, entry);
   });
@@ -159,8 +161,8 @@ export default async function ReductionsPage({ searchParams }: { searchParams?: 
             <Input name="taxpayerCode" placeholder="Code contribuable" defaultValue={taxpayerCode ?? ""} />
             <Input name="taxpayerPhone" placeholder="Telephone contribuable" defaultValue={taxpayerPhone ?? ""} />
             <Input name="noticeNumber" placeholder="Numero d'avis" defaultValue={noticeNumber ?? ""} />
-            <Input name="from" type="date" defaultValue={getParam(searchParams, "from") ?? ""} />
-            <Input name="to" type="date" defaultValue={getParam(searchParams, "to") ?? ""} />
+            <Input name="from" type="date" defaultValue={getParam(resolvedParams, "from") ?? ""} />
+            <Input name="to" type="date" defaultValue={getParam(resolvedParams, "to") ?? ""} />
             <select
               name="pageSize"
               defaultValue={String(pageSize)}
