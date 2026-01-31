@@ -10,7 +10,9 @@
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed"
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:seed": "prisma db seed",
+    "prisma:seed:prod": "tsx prisma/seed-prod.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
