@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const categorySchema = z.object({
   label: z.string().min(2),
@@ -11,6 +12,7 @@ const categorySchema = z.object({
 });
 
 export async function createTaxpayerCategory(formData: FormData) {
+  await assertCsrfToken(formData);
   const parsed = categorySchema.safeParse({
     label: String(formData.get("label") ?? "").trim(),
     code: String(formData.get("code") ?? "").trim(),
@@ -34,6 +36,7 @@ export async function createTaxpayerCategory(formData: FormData) {
 }
 
 export async function updateTaxpayerCategory(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 
@@ -57,5 +60,31 @@ export async function updateTaxpayerCategory(formData: FormData) {
   });
 
   revalidatePath("/admin/settings");
+  revalidatePath("/taxpayers/new");
+}
+
+export async function deleteTaxpayerCategory(formData: FormData) {
+  await assertCsrfToken(formData);
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Identifiant manquant");
+
+  const category = await prisma.taxpayerCategory.findUnique({
+    where: { id },
+    select: { id: true, label: true },
+  });
+  if (!category) {
+    throw new Error("Categorie introuvable");
+  }
+
+  const taxpayerCount = await prisma.taxpayer.count({
+    where: { category: category.label },
+  });
+  if (taxpayerCount > 0) {
+    throw new Error("Suppression impossible: des contribuables utilisent cette categorie.");
+  }
+
+  await prisma.taxpayerCategory.delete({ where: { id } });
+
+  revalidatePath("/admin/settings/categories");
   revalidatePath("/taxpayers/new");
 }

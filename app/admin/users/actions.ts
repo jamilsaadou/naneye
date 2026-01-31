@@ -1,10 +1,11 @@
 "use server";
 
-import { createHash } from "crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { MODULE_IDS } from "@/lib/modules";
+import { hashPassword } from "@/lib/passwords";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const roleSchema = z.enum(["SUPER_ADMIN", "ADMIN", "AGENT", "CAISSIER", "AUDITEUR"]);
 
@@ -26,11 +27,8 @@ const updateUserSchema = z.object({
   supervisorId: z.string().optional().nullable(),
 });
 
-function hashPassword(value: string) {
-  return createHash("sha256").update(value).digest("hex");
-}
-
 export async function createUser(formData: FormData) {
+  await assertCsrfToken(formData);
   const raw = Object.fromEntries(formData.entries()) as Record<string, string>;
   const parsed = createUserSchema.safeParse({
     email: raw.email ?? "",
@@ -73,12 +71,13 @@ export async function createUser(formData: FormData) {
     throw new Error("Email déjà utilisé");
   }
 
+  const passwordHash = await hashPassword(parsed.data.password);
   await prisma.user.create({
     data: {
       email: parsed.data.email,
       name: parsed.data.name ?? null,
       role: parsed.data.role,
-      passwordHash: hashPassword(parsed.data.password),
+      passwordHash,
       enabledModules: MODULE_IDS,
       communeId: parsed.data.communeId,
       supervisorId: parsed.data.supervisorId,
@@ -89,6 +88,7 @@ export async function createUser(formData: FormData) {
 }
 
 export async function updateUser(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 
@@ -143,6 +143,7 @@ export async function updateUser(formData: FormData) {
     throw new Error("Email déjà utilisé");
   }
 
+  const passwordHash = parsed.data.password ? await hashPassword(parsed.data.password) : null;
   await prisma.user.update({
     where: { id },
     data: {
@@ -152,7 +153,7 @@ export async function updateUser(formData: FormData) {
       enabledModules: modules,
       communeId: parsed.data.communeId,
       supervisorId: parsed.data.supervisorId,
-      ...(parsed.data.password ? { passwordHash: hashPassword(parsed.data.password) } : {}),
+      ...(passwordHash ? { passwordHash } : {}),
     },
   });
 

@@ -5,6 +5,7 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { sendCollectorCredentials, sendCollectorResetCredentials } from "@/lib/smtp";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const statusSchema = z.enum(["ACTIVE", "SUSPENDED"]);
 
@@ -25,6 +26,7 @@ function generateCollectorPassword() {
 }
 
 export async function createCollector(formData: FormData) {
+  await assertCsrfToken(formData);
   const raw = Object.fromEntries(formData.entries()) as Record<string, string>;
   const parsed = collectorCreateSchema.safeParse({
     code: raw.code ?? "",
@@ -73,6 +75,7 @@ export async function createCollector(formData: FormData) {
 }
 
 export async function updateCollector(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 
@@ -111,6 +114,7 @@ export async function updateCollector(formData: FormData) {
 }
 
 export async function setCollectorStatus(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "");
   if (!id) throw new Error("Identifiant manquant");
@@ -124,6 +128,7 @@ export async function setCollectorStatus(formData: FormData) {
 }
 
 export async function resetCollectorCredentials(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 

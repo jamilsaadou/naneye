@@ -1,13 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { randomUUID } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { calculateNoticesForAllTaxpayers } from "@/lib/tax-calculation";
 import { logAudit } from "@/lib/audit";
+import { assertCsrfToken } from "@/lib/csrf";
+import { storeUpload, UploadPresets } from "@/lib/uploads";
 
 const settingsSchema = z.object({
   municipalityName: z.string().min(2),
@@ -27,17 +26,11 @@ function getString(value: FormDataEntryValue | undefined) {
 }
 
 async function storeLogo(file: File) {
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadDir, { recursive: true });
-  const safeName = file.name ? file.name.replace(/[^a-zA-Z0-9._-]/g, "_") : "logo";
-  const filename = `${randomUUID()}-${safeName}`;
-  const filePath = path.join(uploadDir, filename);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(filePath, buffer);
-  return `/uploads/${filename}`;
+  return storeUpload(file, UploadPresets.logo);
 }
 
 export async function updateSettings(formData: FormData) {
+  await assertCsrfToken(formData);
   const raw = Object.fromEntries(formData.entries()) as Record<string, FormDataEntryValue>;
   const parsed = settingsSchema.safeParse({
     municipalityName: getString(raw.municipalityName),
@@ -82,6 +75,9 @@ export async function updateSettings(formData: FormData) {
 
 export async function calculateAllTaxNotices(formData?: FormData) {
   try {
+    if (formData) {
+      await assertCsrfToken(formData);
+    }
     const yearValue = formData ? String(formData.get("year") ?? "") : "";
     const year = Number.parseInt(yearValue, 10);
     if (!year || Number.isNaN(year)) {

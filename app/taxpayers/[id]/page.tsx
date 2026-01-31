@@ -8,6 +8,104 @@ import { updateTaxpayer, updateTaxpayerMeasures } from "../actions";
 import { OsmLocation } from "@/components/ui/osm-location";
 
 const SALUBRITE_CODE = "SALUBRITE";
+const STATUS_LABELS: Record<string, string> = {
+  EN_ATTENTE: "En attente",
+  ACTIVE: "Approuvé",
+  ARCHIVED: "Archivé",
+};
+
+const AUDIT_FIELD_LABELS: Array<[string, string]> = [
+  ["name", "Nom"],
+  ["category", "Catégorie"],
+  ["commune", "Commune"],
+  ["neighborhood", "Quartier"],
+  ["groupId", "Groupe"],
+  ["status", "Statut"],
+  ["address", "Adresse"],
+  ["phone", "Téléphone"],
+  ["email", "Email"],
+  ["startedAt", "Début d'exercice"],
+];
+
+const ACTION_LABELS: Record<string, string> = {
+  TAXPAYER_CREATED: "Création du contribuable",
+  TAXPAYER_UPDATED: "Mise à jour du contribuable",
+  TAXPAYER_APPROVED: "Approbation du contribuable",
+  TAXPAYER_ARCHIVED: "Archivage du contribuable",
+  TAXPAYER_DELETED: "Suppression du contribuable",
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeCompareValue(key: string, value: unknown) {
+  if (value === null || value === undefined || value === "") return "";
+  if (key === "startedAt") {
+    const date = new Date(value as string);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString().slice(0, 10);
+    }
+  }
+  return String(value);
+}
+
+function formatAuditValue(key: string, value: unknown, groupNameById: Map<string, string>) {
+  if (value === null || value === undefined || value === "") {
+    return key === "groupId" ? "Aucun" : "—";
+  }
+  if (key === "status" && typeof value === "string") {
+    return STATUS_LABELS[value] ?? value;
+  }
+  if (key === "groupId") {
+    if (typeof value === "string") {
+      return groupNameById.get(value) ?? value;
+    }
+    return "Aucun";
+  }
+  if (key === "startedAt") {
+    const date = new Date(value as string);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleDateString("fr-FR");
+    }
+  }
+  return String(value);
+}
+
+function buildAuditDetails(
+  log: { action: string; before: unknown; after: unknown },
+  groupNameById: Map<string, string>,
+) {
+  const before = isRecord(log.before) ? log.before : null;
+  const after = isRecord(log.after) ? log.after : null;
+  const items: Array<{ label: string; from?: string; to?: string; value?: string }> = [];
+
+  if (before && after) {
+    for (const [key, label] of AUDIT_FIELD_LABELS) {
+      const beforeValue = normalizeCompareValue(key, before[key]);
+      const afterValue = normalizeCompareValue(key, after[key]);
+      if (beforeValue === afterValue) continue;
+      items.push({
+        label,
+        from: formatAuditValue(key, before[key], groupNameById),
+        to: formatAuditValue(key, after[key], groupNameById),
+      });
+    }
+    return { label: "Changements", items };
+  }
+
+  const source = after ?? before;
+  if (source) {
+    for (const [key, label] of AUDIT_FIELD_LABELS) {
+      const value = formatAuditValue(key, source[key], groupNameById);
+      if (value === "—") continue;
+      items.push({ label, value });
+    }
+  }
+
+  const detailLabel = after ? "Données créées" : "Dernier état connu";
+  return { label: detailLabel, items };
+}
 
 export default async function TaxpayerDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -54,6 +152,7 @@ export default async function TaxpayerDetailsPage({ params }: { params: Promise<
     orderBy: { createdAt: "desc" },
     take: 10,
   });
+  const groupNameById = new Map(groups.map((group) => [group.id, group.name]));
   const measureTaxes = taxes.filter((tax) => tax.code.toUpperCase() !== SALUBRITE_CODE);
   const measuresByTaxId = new Map(taxpayer.measures.map((measure) => [measure.taxId, measure.quantity]));
   const latestNotice = taxpayer.notices[0];
@@ -248,19 +347,47 @@ export default async function TaxpayerDetailsPage({ params }: { params: Promise<
             <div className="text-sm text-muted-foreground">Aucune modification enregistrée.</div>
           ) : (
             <div className="space-y-3 text-sm">
-              {auditLogs.map((log) => (
-                <div key={log.id} className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 last:border-0">
-                  <div>
-                    <div className="font-medium text-slate-900">{log.action}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {log.actor?.name ?? log.actor?.email ?? "Système"}
+              {auditLogs.map((log) => {
+                const details = buildAuditDetails(log, groupNameById);
+                const actionLabel = ACTION_LABELS[log.action] ?? log.action;
+                const actorLabel = log.actor?.name ?? log.actor?.email ?? "Système";
+                return (
+                  <div key={log.id} className="rounded-xl border border-border/60 bg-white/80 p-4 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-medium text-slate-900">{actionLabel}</div>
+                        <div className="text-xs text-muted-foreground">Par {actorLabel}</div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(log.createdAt).toLocaleString("fr-FR")}
+                      </div>
                     </div>
+                    {details.items.length > 0 ? (
+                      <div className="mt-3 rounded-lg border border-border/60 bg-slate-50/80 p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                          {details.label}
+                        </div>
+                        <div className="mt-2 grid gap-1 text-xs text-slate-700">
+                          {details.items.map((item) => (
+                            <div key={`${log.id}-${item.label}`} className="flex flex-wrap gap-2">
+                              <span className="font-medium text-slate-800">{item.label}:</span>
+                              {item.from !== undefined && item.to !== undefined ? (
+                                <span className="text-slate-600">
+                                  {item.from} → {item.to}
+                                </span>
+                              ) : (
+                                <span className="text-slate-600">{item.value}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-xs text-muted-foreground">Aucun détail enregistré.</div>
+                    )}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(log.createdAt).toLocaleString("fr-FR")}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

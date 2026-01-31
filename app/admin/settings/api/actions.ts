@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const apiSchema = z.object({
   apiBaseUrl: z.string().url().optional().nullable(),
@@ -13,6 +14,7 @@ function getString(value: FormDataEntryValue | undefined) {
 }
 
 export async function updateApiSettings(formData: FormData) {
+  await assertCsrfToken(formData);
   const raw = Object.fromEntries(formData.entries()) as Record<string, FormDataEntryValue>;
   const parsed = apiSchema.safeParse({
     apiBaseUrl: getString(raw.apiBaseUrl) || null,

@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { ProgressSubmit } from "@/components/ui/progress-submit";
+import { CsrfTokenField } from "@/components/ui/csrf-token-field";
 
 type ActionState = { ok: boolean; message: string } | null;
 
@@ -27,6 +28,7 @@ export function CalculationForm({
 
   return (
     <form action={formAction} className="space-y-3">
+      <CsrfTokenField />
       {children}
       <ProgressSubmit label={buttonLabel} pendingLabel={pendingLabel} variant={variant} />
       {state?.message ? (

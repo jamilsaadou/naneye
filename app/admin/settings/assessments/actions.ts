@@ -1,11 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { randomUUID } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { assertCsrfToken } from "@/lib/csrf";
+import { storeUpload, UploadPresets } from "@/lib/uploads";
 
 const templateSchema = z.object({
   assessmentHeader: z.string().optional().nullable(),
@@ -17,17 +16,11 @@ function getString(value: FormDataEntryValue | undefined) {
 }
 
 async function storeTemplateImage(file: File) {
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadDir, { recursive: true });
-  const safeName = file.name ? file.name.replace(/[^a-zA-Z0-9._-]/g, "_") : "template";
-  const filename = `${randomUUID()}-${safeName}`;
-  const filePath = path.join(uploadDir, filename);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(filePath, buffer);
-  return `/uploads/${filename}`;
+  return storeUpload(file, UploadPresets.template);
 }
 
 export async function updateAssessmentTemplate(formData: FormData) {
+  await assertCsrfToken(formData);
   const raw = Object.fromEntries(formData.entries()) as Record<string, FormDataEntryValue>;
   const parsed = templateSchema.safeParse({
     assessmentHeader: getString(raw.assessmentHeader) || null,

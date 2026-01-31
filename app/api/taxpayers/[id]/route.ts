@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { assertCsrfHeader } from "@/lib/csrf";
 
 const statusSchema = z.enum(["EN_ATTENTE", "ACTIVE", "ARCHIVED"]);
 
@@ -30,6 +31,13 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
+  try {
+    await assertCsrfHeader(request);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Token CSRF invalide.";
+    return NextResponse.json({ message }, { status: 403 });
+  }
+
   const payload = (await request.json().catch(() => null)) as Record<string, string> | null;
   const parsed = taxpayerSchema.safeParse(payload);
 
@@ -71,7 +79,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   return NextResponse.json(taxpayer);
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  try {
+    await assertCsrfHeader(request);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Token CSRF invalide.";
+    return NextResponse.json({ message }, { status: 403 });
+  }
   const taxpayer = await prisma.taxpayer.update({
     where: { id: params.id },
     data: { status: "ARCHIVED" },

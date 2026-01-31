@@ -4,8 +4,16 @@ import { calculateNoticeForTaxpayer } from "@/lib/tax-calculation";
 import { getSession, getUserWithCommune } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { resolveBulkFilters } from "@/lib/bulk-notice";
+import { assertCsrfHeader } from "@/lib/csrf";
 
 export async function POST(request: Request) {
+  try {
+    await assertCsrfHeader(request);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Token CSRF invalide.";
+    return NextResponse.json({ ok: false, message }, { status: 403 });
+  }
+
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });

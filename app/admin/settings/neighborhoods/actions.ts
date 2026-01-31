@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const neighborhoodSchema = z.object({
   name: z.string().min(2),
@@ -10,6 +11,7 @@ const neighborhoodSchema = z.object({
 });
 
 export async function createNeighborhood(formData: FormData) {
+  await assertCsrfToken(formData);
   const parsed = neighborhoodSchema.safeParse({
     name: String(formData.get("name") ?? "").trim(),
     communeId: String(formData.get("communeId") ?? "").trim(),
@@ -31,6 +33,7 @@ export async function createNeighborhood(formData: FormData) {
 }
 
 export async function updateNeighborhood(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 

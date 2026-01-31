@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const rateSchema = z
   .string()
@@ -17,6 +18,7 @@ const taxSchema = z.object({
 });
 
 export async function createTax(formData: FormData) {
+  await assertCsrfToken(formData);
   const raw = Object.fromEntries(formData.entries()) as Record<string, string>;
   const parsed = taxSchema.safeParse({
     code: raw.code ?? "",
@@ -47,6 +49,7 @@ export async function createTax(formData: FormData) {
 }
 
 export async function updateTax(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 
@@ -83,6 +86,7 @@ export async function updateTax(formData: FormData) {
 }
 
 export async function toggleTaxStatus(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "");
   if (!id) throw new Error("Identifiant manquant");
@@ -93,4 +97,33 @@ export async function toggleTaxStatus(formData: FormData) {
   });
 
   revalidatePath("/taxes");
+}
+
+export async function deleteTax(formData: FormData) {
+  await assertCsrfToken(formData);
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Identifiant manquant");
+
+  const tax = await prisma.tax.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!tax) {
+    throw new Error("Taxe introuvable");
+  }
+
+  const [measureCount, ruleCount, lineCount] = await Promise.all([
+    prisma.taxpayerMeasure.count({ where: { taxId: id } }),
+    prisma.taxRule.count({ where: { taxId: id } }),
+    prisma.noticeLine.count({ where: { taxId: id } }),
+  ]);
+
+  if (measureCount > 0 || ruleCount > 0 || lineCount > 0) {
+    throw new Error("Suppression impossible: cette taxe est utilisée.");
+  }
+
+  await prisma.tax.delete({ where: { id } });
+
+  revalidatePath("/taxes");
+  revalidatePath("/taxes/rules");
 }

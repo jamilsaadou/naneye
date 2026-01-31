@@ -1,14 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { randomUUID } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { calculateNoticeForTaxpayer } from "@/lib/tax-calculation";
 import { logAudit } from "@/lib/audit";
 import { getSession, getUserWithCommune } from "@/lib/auth";
+import { assertCsrfToken } from "@/lib/csrf";
+import { storeUpload, UploadPresets } from "@/lib/uploads";
 
 const statusSchema = z.enum(["EN_ATTENTE", "ACTIVE", "ARCHIVED"]);
 
@@ -61,17 +60,11 @@ async function validateGroupAssignment(groupId: string | null, commune: string, 
 }
 
 async function storePhoto(file: File) {
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadDir, { recursive: true });
-  const safeName = file.name ? file.name.replace(/[^a-zA-Z0-9._-]/g, "_") : "photo";
-  const filename = `${randomUUID()}-${safeName}`;
-  const filePath = path.join(uploadDir, filename);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(filePath, buffer);
-  return `/uploads/${filename}`;
+  return storeUpload(file, UploadPresets.photo);
 }
 
 export async function createTaxpayer(formData: FormData) {
+  await assertCsrfToken(formData);
   const scopedCommune = await getScopedCommuneName();
   const raw = Object.fromEntries(formData.entries()) as Record<string, FormDataEntryValue>;
   const parsed = taxpayerSchema.safeParse({
@@ -168,6 +161,7 @@ export async function createTaxpayer(formData: FormData) {
 }
 
 export async function updateTaxpayer(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 
@@ -250,6 +244,7 @@ export async function updateTaxpayer(formData: FormData) {
 }
 
 export async function archiveTaxpayer(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 
@@ -272,6 +267,7 @@ export async function archiveTaxpayer(formData: FormData) {
 }
 
 export async function approveTaxpayer(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 
@@ -298,6 +294,7 @@ export async function approveTaxpayer(formData: FormData) {
 }
 
 export async function deleteNoticeByYear(formData: FormData) {
+  await assertCsrfToken(formData);
   const session = await getSession();
   if (!session || (session.role !== "SUPER_ADMIN" && session.role !== "ADMIN")) {
     throw new Error("Accès refusé");
@@ -352,6 +349,7 @@ export async function deleteNoticeByYear(formData: FormData) {
 }
 
 export async function deleteTaxpayer(formData: FormData) {
+  await assertCsrfToken(formData);
   const session = await getSession();
   if (!session || session.role !== "SUPER_ADMIN") {
     throw new Error("Accès refusé");
@@ -376,6 +374,7 @@ export async function deleteTaxpayer(formData: FormData) {
 }
 
 export async function updateTaxpayerMeasures(formData: FormData) {
+  await assertCsrfToken(formData);
   const taxpayerId = String(formData.get("taxpayerId") ?? "");
   if (!taxpayerId) throw new Error("Identifiant manquant");
   const scopedCommune = await getScopedCommuneName();
@@ -411,6 +410,7 @@ export async function updateTaxpayerMeasures(formData: FormData) {
 }
 
 export async function calculateTaxpayerNotice(formData: FormData) {
+  await assertCsrfToken(formData);
   const taxpayerId = String(formData.get("taxpayerId") ?? "");
   if (!taxpayerId) {
     return { ok: false, message: "Identifiant manquant." };

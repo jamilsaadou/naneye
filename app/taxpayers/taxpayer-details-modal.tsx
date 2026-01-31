@@ -14,8 +14,11 @@ export type TaxpayerModalNotice = {
 export type TaxpayerModalLog = {
   id: string;
   action: string;
+  actionLabel?: string;
   actorName: string;
   createdAt: string;
+  detailsLabel?: string;
+  details?: Array<{ label: string; from?: string; to?: string; value?: string }>;
 };
 
 export type TaxpayerModalData = {
@@ -62,7 +65,7 @@ export type TaxpayerModalData = {
   }>;
 };
 
-const STATUS_LABELS: Record<string, string> = {
+const NOTICE_STATUS_LABELS: Record<string, string> = {
   UNPAID: "Non payé",
   PARTIAL: "Partiel",
   PAID: "Payé",
@@ -78,7 +81,7 @@ export function TaxpayerDetailsModal({
   const [open, setOpen] = useState(false);
   const [activePhoto, setActivePhoto] = useState<string | null>(null);
   const latestNotice = taxpayer.latestNotice;
-  const statusLabel = latestNotice ? STATUS_LABELS[latestNotice.status] ?? "Non payé" : "Aucun";
+  const statusLabel = latestNotice ? NOTICE_STATUS_LABELS[latestNotice.status] ?? "Non payé" : "Aucun";
   const statusVariant = latestNotice?.status === "PAID" ? "success" : latestNotice?.status === "PARTIAL" ? "warning" : "outline";
 
   const startedAt = useMemo(() => {
@@ -261,13 +264,38 @@ export function TaxpayerDetailsModal({
                       logs.map((log) => (
                         <div
                           key={log.id}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/50 bg-white/70 px-3 py-2"
+                          className="rounded-xl border border-white/50 bg-white/70 px-3 py-2"
                         >
-                          <div>
-                            <div className="font-medium text-slate-900">{log.action}</div>
-                            <div className="text-xs text-slate-500">{log.actorName}</div>
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="font-medium text-slate-900">{log.actionLabel ?? log.action}</div>
+                              <div className="text-xs text-slate-500">Par {log.actorName}</div>
+                            </div>
+                            <div className="text-xs text-slate-500">{log.createdAt}</div>
                           </div>
-                          <div className="text-xs text-slate-500">{log.createdAt}</div>
+                          {log.details && log.details.length > 0 ? (
+                            <div className="mt-2 rounded-lg border border-white/60 bg-white/80 px-3 py-2">
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                                {log.detailsLabel ?? "Détails"}
+                              </div>
+                              <div className="mt-2 grid gap-1 text-xs text-slate-700">
+                                {log.details.map((item) => (
+                                  <div key={`${log.id}-${item.label}`} className="flex flex-wrap gap-2">
+                                    <span className="font-medium text-slate-800">{item.label}:</span>
+                                    {item.from !== undefined && item.to !== undefined ? (
+                                      <span className="text-slate-600">
+                                        {item.from} → {item.to}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-600">{item.value}</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-2 text-xs text-slate-500">Aucun détail enregistré.</div>
+                          )}
                         </div>
                       ))
                     )}

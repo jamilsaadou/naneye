@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ActionForm } from "@/components/ui/action-form";
-import { createTaxRule, toggleTaxRuleStatus, updateTaxRule } from "./actions";
+import { createTaxRule, deleteTaxRule, toggleTaxRuleStatus, updateTaxRule } from "./actions";
 
 export default async function TaxRulesPage() {
   const [rules, taxes] = await Promise.all([
@@ -15,6 +15,16 @@ export default async function TaxRulesPage() {
     }),
     prisma.tax.findMany({ orderBy: { label: "asc" } }),
   ]);
+  const taxpayerCounts = await Promise.all(
+    rules.map((rule) => {
+      const where: Record<string, string> = {};
+      if (rule.commune) where.commune = rule.commune;
+      if (rule.neighborhood) where.neighborhood = rule.neighborhood;
+      if (rule.category) where.category = rule.category;
+      return Object.keys(where).length ? prisma.taxpayer.count({ where }) : prisma.taxpayer.count();
+    }),
+  );
+  const countByRuleId = new Map(rules.map((rule, index) => [rule.id, taxpayerCounts[index] ?? 0]));
 
   return (
     <div className="space-y-6">
@@ -79,18 +89,23 @@ export default async function TaxRulesPage() {
                 <TableHead>Quartier</TableHead>
                 <TableHead>Catégorie</TableHead>
                 <TableHead>Zone</TableHead>
+                <TableHead>Contribuables</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rules.map((rule) => (
-                <TableRow key={rule.id}>
+              {rules.map((rule) => {
+                const taxpayerCount = countByRuleId.get(rule.id) ?? 0;
+                const canDelete = taxpayerCount === 0;
+                return (
+                  <TableRow key={rule.id}>
                   <TableCell>{rule.tax.label}</TableCell>
                   <TableCell>{rule.commune ?? "-"}</TableCell>
                   <TableCell>{rule.neighborhood ?? "-"}</TableCell>
                   <TableCell>{rule.category ?? "-"}</TableCell>
                   <TableCell>{rule.zone ?? "-"}</TableCell>
+                  <TableCell>{taxpayerCount}</TableCell>
                   <TableCell>
                     <Badge variant={rule.active ? "success" : "outline"}>{rule.active ? "Active" : "Inactive"}</Badge>
                   </TableCell>
@@ -145,12 +160,29 @@ export default async function TaxRulesPage() {
                         {rule.active ? "Désactiver" : "Activer"}
                       </Button>
                     </ActionForm>
+                    <ActionForm
+                      action={deleteTaxRule}
+                      className="mt-2"
+                      successMessage="Règle supprimée."
+                      showMessage={false}
+                    >
+                      <input type="hidden" name="id" value={rule.id} />
+                      <Button type="submit" variant="outline" size="sm" disabled={!canDelete}>
+                        Supprimer
+                      </Button>
+                      {!canDelete ? (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Supprimez d&apos;abord les contribuables concernés.
+                        </div>
+                      ) : null}
+                    </ActionForm>
                   </TableCell>
-                </TableRow>
-              ))}
+                  </TableRow>
+                );
+              })}
               {rules.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-6 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-6 text-center text-sm text-muted-foreground">
                     Aucune règle enregistrée.
                   </TableCell>
                 </TableRow>

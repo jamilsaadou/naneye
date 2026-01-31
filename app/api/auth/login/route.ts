@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { assertCsrfHeader } from "@/lib/csrf";
+import { hashPassword, verifyPassword } from "@/lib/passwords";
+import {
+  createSessionToken,
+  getSessionCookieOptions,
+  SESSION_COOKIE_NAME,
+} from "@/lib/session";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -9,6 +15,13 @@ const loginSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  try {
+    await assertCsrfHeader(request);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Token CSRF invalide.";
+    return NextResponse.json({ message }, { status: 403 });
+  }
+
   const payload = await request.json().catch(() => null);
   const parsed = loginSchema.safeParse(payload);
 
@@ -17,11 +30,21 @@ export async function POST(request: Request) {
   }
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-
-  const hashed = createHash("sha256").update(parsed.data.password).digest("hex");
-
-  if (!user || hashed !== user.passwordHash) {
+  if (!user) {
     return NextResponse.json({ message: "Identifiants invalides" }, { status: 401 });
+  }
+
+  const verification = await verifyPassword(parsed.data.password, user.passwordHash);
+  if (!verification.ok) {
+    return NextResponse.json({ message: "Identifiants invalides" }, { status: 401 });
+  }
+
+  if (verification.needsRehash) {
+    const newHash = await hashPassword(parsed.data.password);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: newHash },
+    });
   }
 
   const response = NextResponse.json({
@@ -31,12 +54,11 @@ export async function POST(request: Request) {
     role: user.role,
   });
 
+  const sessionToken = await createSessionToken({ id: user.id, role: user.role });
   response.cookies.set({
-    name: "session",
-    value: Buffer.from(JSON.stringify({ id: user.id, role: user.role })).toString("base64"),
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
+    name: SESSION_COOKIE_NAME,
+    value: sessionToken,
+    ...getSessionCookieOptions(),
   });
 
   return response;

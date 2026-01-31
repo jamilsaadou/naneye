@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const ruleSchema = z
   .object({
@@ -30,6 +31,7 @@ function normalizeRuleInput(raw: Record<string, string>) {
 }
 
 export async function createTaxRule(formData: FormData) {
+  await assertCsrfToken(formData);
   const raw = Object.fromEntries(formData.entries()) as Record<string, string>;
   const parsed = ruleSchema.safeParse(normalizeRuleInput(raw));
 
@@ -45,6 +47,7 @@ export async function createTaxRule(formData: FormData) {
 }
 
 export async function updateTaxRule(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 
@@ -64,6 +67,7 @@ export async function updateTaxRule(formData: FormData) {
 }
 
 export async function toggleTaxRuleStatus(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   const active = String(formData.get("active") ?? "");
   if (!id) throw new Error("Identifiant manquant");
@@ -72,6 +76,41 @@ export async function toggleTaxRuleStatus(formData: FormData) {
     where: { id },
     data: { active: active === "true" },
   });
+
+  revalidatePath("/taxes/rules");
+}
+
+function buildTaxpayerWhere(rule: { commune: string | null; neighborhood: string | null; category: string | null }) {
+  const where: Record<string, string> = {};
+  if (rule.commune) where.commune = rule.commune;
+  if (rule.neighborhood) where.neighborhood = rule.neighborhood;
+  if (rule.category) where.category = rule.category;
+  return where;
+}
+
+export async function deleteTaxRule(formData: FormData) {
+  await assertCsrfToken(formData);
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Identifiant manquant");
+
+  const rule = await prisma.taxRule.findUnique({
+    where: { id },
+    select: { id: true, commune: true, neighborhood: true, category: true },
+  });
+  if (!rule) {
+    throw new Error("Règle introuvable");
+  }
+
+  const where = buildTaxpayerWhere(rule);
+  const taxpayerCount = Object.keys(where).length
+    ? await prisma.taxpayer.count({ where })
+    : await prisma.taxpayer.count();
+
+  if (taxpayerCount > 0) {
+    throw new Error("Suppression impossible: des contribuables correspondent à cette règle.");
+  }
+
+  await prisma.taxRule.delete({ where: { id } });
 
   revalidatePath("/taxes/rules");
 }

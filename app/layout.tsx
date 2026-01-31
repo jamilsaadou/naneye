@@ -8,6 +8,7 @@ import { getUserWithRole } from "@/lib/auth";
 import { MODULE_IDS } from "@/lib/modules";
 import { prisma } from "@/lib/prisma";
 import { hslString, pickForeground } from "@/lib/colors";
+import { CsrfTokenField } from "@/components/ui/csrf-token-field";
 
 const plexSans = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -160,6 +161,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-600">
                     <span>Connecte {user.name ?? user.email}</span>
                     <form action="/api/auth/logout" method="post">
+                      <CsrfTokenField />
                       <button type="submit" className="rounded-full border border-slate-200 p-1 hover:bg-slate-50">
                         <svg
                           viewBox="0 0 24 24"
@@ -529,6 +531,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       </a>
                     )}
                     <form action="/api/auth/logout" method="post">
+                      <CsrfTokenField />
                       <button
                         type="submit"
                         className="w-full rounded-lg border border-dashed px-3 py-2 text-left hover:bg-slate-50"

@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
+import { readSessionToken, SESSION_COOKIE_NAME } from "@/lib/session";
 
 export type SessionUser = {
   id: string;
@@ -9,16 +10,10 @@ export type SessionUser = {
 
 export async function getSession(): Promise<SessionUser | null> {
   const cookieStore = await cookies();
-  const raw = cookieStore.get("session")?.value;
-  if (!raw) return null;
-
-  try {
-    const decoded = JSON.parse(Buffer.from(raw, "base64").toString("utf-8")) as SessionUser;
-    if (!decoded?.id || !decoded?.role) return null;
-    return decoded;
-  } catch {
-    return null;
-  }
+  const raw = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const decoded = await readSessionToken(raw);
+  if (!decoded?.id || !decoded?.role) return null;
+  return { id: decoded.id, role: decoded.role as Role };
 }
 
 export async function requireUser() {

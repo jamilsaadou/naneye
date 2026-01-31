@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const communeSchema = z.object({
   name: z.string().min(2),
@@ -10,6 +11,7 @@ const communeSchema = z.object({
 });
 
 export async function createCommune(formData: FormData) {
+  await assertCsrfToken(formData);
   const parsed = communeSchema.safeParse({
     name: String(formData.get("name") ?? "").trim(),
     code: String(formData.get("code") ?? "").trim(),
@@ -28,6 +30,7 @@ export async function createCommune(formData: FormData) {
 }
 
 export async function updateCommune(formData: FormData) {
+  await assertCsrfToken(formData);
   const id = String(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");
 

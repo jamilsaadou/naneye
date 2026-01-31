@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const reductionSchema = z.object({
   taxpayerCode: z.string().min(3),
@@ -15,6 +16,7 @@ const reductionSchema = z.object({
 });
 
 export async function applyNoticeReduction(formData: FormData) {
+  await assertCsrfToken(formData);
   const session = await getSession();
   if (!session) {
     throw new Error("Acces refuse");
@@ -167,6 +169,7 @@ export async function applyNoticeReduction(formData: FormData) {
 }
 
 export async function approveReductionRequest(formData: FormData) {
+  await assertCsrfToken(formData);
   const session = await getSession();
   if (!session || (session.role !== "SUPER_ADMIN" && session.role !== "ADMIN")) {
     throw new Error("Acces refuse");
@@ -261,6 +264,7 @@ export async function approveReductionRequest(formData: FormData) {
 }
 
 export async function rejectReductionRequest(formData: FormData) {
+  await assertCsrfToken(formData);
   const session = await getSession();
   if (!session || (session.role !== "SUPER_ADMIN" && session.role !== "ADMIN")) {
     throw new Error("Acces refuse");

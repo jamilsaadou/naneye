@@ -4,10 +4,22 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ActionForm } from "@/components/ui/action-form";
-import { createTaxpayerCategory, updateTaxpayerCategory } from "@/app/taxpayers/categories/actions";
+import { createTaxpayerCategory, deleteTaxpayerCategory, updateTaxpayerCategory } from "@/app/taxpayers/categories/actions";
 
 export default async function TaxpayerCategoriesPage() {
   const categories = await prisma.taxpayerCategory.findMany({ orderBy: { label: "asc" } });
+  const categoryCounts = categories.length
+    ? await prisma.taxpayer.groupBy({
+        by: ["category"],
+        _count: { _all: true },
+        where: { category: { in: categories.map((category) => category.label) } },
+      })
+    : [];
+  const countByCategory = new Map(
+    categoryCounts
+      .filter((row) => typeof row.category === "string")
+      .map((row) => [row.category as string, row._count._all]),
+  );
 
   return (
     <div className="space-y-6">
@@ -52,15 +64,20 @@ export default async function TaxpayerCategoriesPage() {
                 <TableHead>Libelle</TableHead>
                 <TableHead>Code</TableHead>
                 <TableHead>Salubrite</TableHead>
+                <TableHead>Contribuables</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {categories.map((category) => (
-                <TableRow key={category.id}>
+              {categories.map((category) => {
+                const taxpayerCount = countByCategory.get(category.label) ?? 0;
+                const canDelete = taxpayerCount === 0;
+                return (
+                  <TableRow key={category.id}>
                   <TableCell>{category.label}</TableCell>
                   <TableCell>{category.code ?? "-"}</TableCell>
                   <TableCell>{category.sanitationAmount.toString()}</TableCell>
+                  <TableCell>{taxpayerCount}</TableCell>
                   <TableCell>
                     <details className="relative">
                       <summary className="cursor-pointer text-sm text-primary">Modifier</summary>
@@ -86,12 +103,29 @@ export default async function TaxpayerCategoriesPage() {
                         </div>
                       </ActionForm>
                     </details>
+                    <ActionForm
+                      action={deleteTaxpayerCategory}
+                      className="mt-2"
+                      successMessage="Categorie supprimée."
+                      showMessage={false}
+                    >
+                      <input type="hidden" name="id" value={category.id} />
+                      <Button type="submit" variant="outline" size="sm" disabled={!canDelete}>
+                        Supprimer
+                      </Button>
+                      {!canDelete ? (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Supprimez d&apos;abord les contribuables de cette categorie.
+                        </div>
+                      ) : null}
+                    </ActionForm>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
               {categories.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
                     Aucune categorie configuree.
                   </TableCell>
                 </TableRow>

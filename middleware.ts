@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  CSRF_COOKIE_NAME,
+  generateCsrfToken,
+  getCsrfCookieOptions,
+} from "@/lib/csrf-core";
+import {
+  createSessionToken,
+  getSessionCookieOptions,
+  readSessionToken,
+  SESSION_COOKIE_NAME,
+  shouldRotateSession,
+} from "@/lib/session";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -17,42 +29,55 @@ function isPublicPath(pathname: string) {
   return false;
 }
 
-function hasSessionCookie(request: NextRequest) {
-  const raw = request.cookies.get("session")?.value;
-  if (!raw) return false;
-  try {
-    const decoded = JSON.parse(Buffer.from(raw, "base64").toString("utf-8"));
-    return Boolean(decoded?.id && decoded?.role);
-  } catch {
-    return false;
-  }
-}
-
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const sessionOk = hasSessionCookie(request);
+  const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const session = await readSessionToken(sessionToken);
+  const sessionOk = Boolean(session);
+  const csrfToken = request.cookies.get(CSRF_COOKIE_NAME)?.value;
 
+  let response: NextResponse;
   if (isPublicPath(pathname)) {
     if (pathname === "/login" && sessionOk) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
+      response = NextResponse.redirect(url);
+    } else {
+      response = NextResponse.next();
     }
-    const response = NextResponse.next();
-    response.headers.set("x-pathname", pathname);
-    return response;
-  }
-
-  if (!sessionOk) {
+  } else if (!sessionOk) {
     if (pathname.startsWith("/api")) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+      response = NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    } else {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      response = NextResponse.redirect(url);
     }
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+  } else {
+    response = NextResponse.next();
   }
 
-  const response = NextResponse.next();
+  if (!csrfToken) {
+    response.cookies.set({
+      name: CSRF_COOKIE_NAME,
+      value: generateCsrfToken(),
+      ...getCsrfCookieOptions(),
+    });
+  }
+
+  if (sessionToken && !session) {
+    response.cookies.set({ name: SESSION_COOKIE_NAME, value: "", path: "/", maxAge: 0 });
+  }
+
+  if (session && shouldRotateSession(session)) {
+    const refreshed = await createSessionToken({ id: session.id, role: session.role });
+    response.cookies.set({
+      name: SESSION_COOKIE_NAME,
+      value: refreshed,
+      ...getSessionCookieOptions(),
+    });
+  }
+
   response.headers.set("x-pathname", pathname);
   return response;
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CsrfTokenField } from "@/components/ui/csrf-token-field";
 import { approveTaxpayer, archiveTaxpayer, deleteTaxpayer } from "./actions";
 import { TaxpayerDetailsModal, type TaxpayerModalData, type TaxpayerModalLog } from "./taxpayer-details-modal";
 import { DeleteNoticeModal } from "./delete-notice-modal";
@@ -27,6 +28,102 @@ const STATUS_LABELS: Record<string, string> = {
   PARTIAL: "Partiel",
   PAID: "Payé",
 };
+
+const AUDIT_FIELD_LABELS: Array<[string, string]> = [
+  ["name", "Nom"],
+  ["category", "Catégorie"],
+  ["commune", "Commune"],
+  ["neighborhood", "Quartier"],
+  ["groupId", "Groupe"],
+  ["status", "Statut"],
+  ["address", "Adresse"],
+  ["phone", "Téléphone"],
+  ["email", "Email"],
+  ["startedAt", "Début d'exercice"],
+];
+
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  TAXPAYER_CREATED: "Création du contribuable",
+  TAXPAYER_UPDATED: "Mise à jour du contribuable",
+  TAXPAYER_APPROVED: "Approbation du contribuable",
+  TAXPAYER_ARCHIVED: "Archivage du contribuable",
+  TAXPAYER_DELETED: "Suppression du contribuable",
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeCompareValue(key: string, value: unknown) {
+  if (value === null || value === undefined || value === "") return "";
+  if (key === "startedAt") {
+    const date = new Date(value as string);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString().slice(0, 10);
+    }
+  }
+  return String(value);
+}
+
+function formatAuditValue(
+  key: string,
+  value: unknown,
+  groupLabelById: Map<string, string>,
+) {
+  if (value === null || value === undefined || value === "") {
+    return key === "groupId" ? "Aucun" : "—";
+  }
+  if (key === "status" && typeof value === "string") {
+    return TAXPAYER_STATUS_LABELS[value] ?? value;
+  }
+  if (key === "groupId" && typeof value === "string") {
+    return groupLabelById.get(value) ?? value;
+  }
+  if (key === "startedAt") {
+    const date = new Date(value as string);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleDateString("fr-FR");
+    }
+  }
+  return String(value);
+}
+
+function buildAuditDetails(
+  log: { before: unknown; after: unknown },
+  groupLabelById: Map<string, string>,
+) {
+  const before = isRecord(log.before) ? log.before : null;
+  const after = isRecord(log.after) ? log.after : null;
+  const items: Array<{ label: string; from?: string; to?: string; value?: string }> = [];
+
+  if (before && after) {
+    for (const [key, label] of AUDIT_FIELD_LABELS) {
+      const beforeValue = normalizeCompareValue(key, before[key]);
+      const afterValue = normalizeCompareValue(key, after[key]);
+      if (beforeValue === afterValue) continue;
+      items.push({
+        label,
+        from: formatAuditValue(key, before[key], groupLabelById),
+        to: formatAuditValue(key, after[key], groupLabelById),
+      });
+    }
+    return { label: "Changements", items };
+  }
+
+  const source = after ?? before;
+  if (source) {
+    for (const [key, label] of AUDIT_FIELD_LABELS) {
+      const value = formatAuditValue(key, source[key], groupLabelById);
+      if (value === "—") continue;
+      items.push({ label, value });
+    }
+  }
+
+  return {
+    label: after ? "Données créées" : "Dernier état connu",
+    items,
+  };
+}
 
 const moneyFormatter = new Intl.NumberFormat("fr-FR", {
   style: "currency",
@@ -198,11 +295,15 @@ export default async function TaxpayersPage({
   for (const log of auditLogs) {
     const existing = logsByTaxpayer.get(log.entityId) ?? [];
     if (existing.length < 5) {
+      const details = buildAuditDetails(log, groupLabelById);
       existing.push({
         id: log.id,
         action: log.action,
+        actionLabel: AUDIT_ACTION_LABELS[log.action] ?? log.action,
         actorName: log.actor?.name ?? log.actor?.email ?? "Système",
         createdAt: new Date(log.createdAt).toLocaleString("fr-FR"),
+        detailsLabel: details.label,
+        details: details.items,
       });
       logsByTaxpayer.set(log.entityId, existing);
     }
@@ -462,6 +563,7 @@ export default async function TaxpayersPage({
                         </Button>
                         {taxpayer.status === STATUS_PENDING ? (
                           <form action={approveTaxpayer}>
+                            <CsrfTokenField />
                             <input type="hidden" name="id" value={taxpayer.id} />
                             <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="Approuver">
                               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -486,6 +588,7 @@ export default async function TaxpayersPage({
                         ) : null}
                         {canDeleteTaxpayer ? (
                           <form action={deleteTaxpayer}>
+                            <CsrfTokenField />
                             <input type="hidden" name="taxpayerId" value={taxpayer.id} />
                             <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="Supprimer le contribuable">
                               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
@@ -500,6 +603,7 @@ export default async function TaxpayersPage({
                         ) : null}
                       </div>
                       <form action={archiveTaxpayer} className="mt-2">
+                        <CsrfTokenField />
                         <input type="hidden" name="id" value={taxpayer.id} />
                         <Button type="submit" variant="outline" size="sm">
                           Archiver

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { ProgressSubmit } from "@/components/ui/progress-submit";
+import { CsrfTokenField } from "@/components/ui/csrf-token-field";
 import { deleteNoticeByYear } from "./actions";
 
 type ActionState = { ok: boolean; message: string } | null;
@@ -59,6 +60,7 @@ export function DeleteNoticeModal({
             </p>
 
             <form action={formAction} className="mt-4 space-y-3">
+              <CsrfTokenField />
               <input type="hidden" name="taxpayerId" value={taxpayerId} />
               <label className="text-sm font-medium text-slate-900">
                 Année fiscale

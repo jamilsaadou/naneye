@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { assertCsrfHeader } from "@/lib/csrf";
 
 const statusSchema = z.enum(["EN_ATTENTE", "ACTIVE", "ARCHIVED"]);
 
@@ -54,6 +55,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  try {
+    await assertCsrfHeader(request);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Token CSRF invalide.";
+    return NextResponse.json({ message }, { status: 403 });
+  }
+
   const payload = (await request.json().catch(() => null)) as Record<string, string> | null;
   const parsed = taxpayerSchema.safeParse(payload);
 

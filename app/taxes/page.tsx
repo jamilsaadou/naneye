@@ -5,12 +5,39 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ActionForm } from "@/components/ui/action-form";
-import { createTax, toggleTaxStatus, updateTax } from "./actions";
+import { createTax, deleteTax, toggleTaxStatus, updateTax } from "./actions";
 
 export default async function TaxesPage() {
   const taxes = await prisma.tax.findMany({
     orderBy: { createdAt: "desc" },
   });
+  const taxIds = taxes.map((tax) => tax.id);
+  const [measureCounts, ruleCounts, lineCounts] = await Promise.all([
+    taxIds.length
+      ? prisma.taxpayerMeasure.groupBy({
+          by: ["taxId"],
+          _count: { _all: true },
+          where: { taxId: { in: taxIds } },
+        })
+      : Promise.resolve([]),
+    taxIds.length
+      ? prisma.taxRule.groupBy({
+          by: ["taxId"],
+          _count: { _all: true },
+          where: { taxId: { in: taxIds } },
+        })
+      : Promise.resolve([]),
+    taxIds.length
+      ? prisma.noticeLine.groupBy({
+          by: ["taxId"],
+          _count: { _all: true },
+          where: { taxId: { in: taxIds } },
+        })
+      : Promise.resolve([]),
+  ]);
+  const measureByTaxId = new Map(measureCounts.map((row) => [row.taxId, row._count._all]));
+  const ruleByTaxId = new Map(ruleCounts.map((row) => [row.taxId, row._count._all]));
+  const lineByTaxId = new Map(lineCounts.map((row) => [row.taxId, row._count._all]));
 
   return (
     <div className="space-y-6">
@@ -58,16 +85,33 @@ export default async function TaxesPage() {
                 <TableHead>Code</TableHead>
                 <TableHead>Libellé</TableHead>
                 <TableHead>Taux</TableHead>
+                <TableHead>Utilisation</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {taxes.map((tax) => (
-                <TableRow key={tax.id}>
+              {taxes.map((tax) => {
+                const measureCount = measureByTaxId.get(tax.id) ?? 0;
+                const ruleCount = ruleByTaxId.get(tax.id) ?? 0;
+                const lineCount = lineByTaxId.get(tax.id) ?? 0;
+                const canDelete = measureCount === 0 && ruleCount === 0 && lineCount === 0;
+                return (
+                  <TableRow key={tax.id}>
                   <TableCell>{tax.code}</TableCell>
                   <TableCell>{tax.label}</TableCell>
                   <TableCell>{tax.rate.toString()}</TableCell>
+                  <TableCell>
+                    <div className="text-xs text-muted-foreground">
+                      Contribuables: <span className="text-slate-700">{measureCount}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Règles: <span className="text-slate-700">{ruleCount}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Avis: <span className="text-slate-700">{lineCount}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge variant={tax.active ? "success" : "outline"}>{tax.active ? "Active" : "Inactive"}</Badge>
                   </TableCell>
@@ -105,12 +149,29 @@ export default async function TaxesPage() {
                         {tax.active ? "Désactiver" : "Activer"}
                       </Button>
                     </ActionForm>
+                    <ActionForm
+                      action={deleteTax}
+                      className="mt-2"
+                      successMessage="Taxe supprimée."
+                      showMessage={false}
+                    >
+                      <input type="hidden" name="id" value={tax.id} />
+                      <Button type="submit" variant="outline" size="sm" disabled={!canDelete}>
+                        Supprimer
+                      </Button>
+                      {!canDelete ? (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Supprimez d&apos;abord les éléments liés.
+                        </div>
+                      ) : null}
+                    </ActionForm>
                   </TableCell>
-                </TableRow>
-              ))}
+                  </TableRow>
+                );
+              })}
               {taxes.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
                     Aucune taxe enregistrée.
                   </TableCell>
                 </TableRow>

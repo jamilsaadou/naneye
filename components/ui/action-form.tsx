@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { CsrfTokenField } from "@/components/ui/csrf-token-field";
 
 type ActionState = { ok: boolean; message: string } | null;
 
@@ -40,6 +41,7 @@ export function ActionForm({
       action={formAction}
       className={className}
     >
+      <CsrfTokenField />
       {children}
       {showMessage && state?.message ? (
         <div className={`text-sm ${state.ok ? "text-emerald-600" : "text-rose-600"}`}>{state.message}</div>

@@ -6,15 +6,15 @@ import {
   Role,
   TaxpayerStatus,
 } from "@prisma/client";
-import { createHash } from "crypto";
+import { hashPassword } from "../lib/passwords";
 
 const prisma = new PrismaClient();
 
 async function main() {
   const adminEmail = "admin@taxes.local";
-  const adminPassword = createHash("sha256").update("Admin@123").digest("hex");
+  const adminPassword = await hashPassword("Admin@123");
   const superAdminEmail = "me.jamilou@gmail.com";
-  const superAdminPassword = createHash("sha256").update("Naneye@").digest("hex");
+  const superAdminPassword = await hashPassword("Naneye@");
 
   await prisma.user.upsert({
     where: { email: superAdminEmail },

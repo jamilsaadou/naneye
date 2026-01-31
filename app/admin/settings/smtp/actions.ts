@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createSmtpTransport } from "@/lib/smtp";
 import { decryptSmtpPassword, encryptSmtpPassword } from "@/lib/smtp-crypto";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const smtpSchema = z.object({
   host: z
@@ -25,6 +26,7 @@ function getString(value: FormDataEntryValue | undefined) {
 }
 
 export async function updateSmtpSettings(formData: FormData) {
+  await assertCsrfToken(formData);
   const raw = Object.fromEntries(formData.entries()) as Record<string, FormDataEntryValue>;
   const portValue = Number.parseInt(getString(raw.smtpPort), 10);
   const parsed = smtpSchema.safeParse({

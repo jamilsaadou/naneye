@@ -166,9 +166,18 @@ export function BulkNoticeGenerator({
     startTransition(async () => {
       setResult(null);
       try {
+        const csrfToken = document.cookie
+          .split(";")
+          .map((part) => part.trim())
+          .find((part) => part.startsWith("csrf_token="))
+          ?.split("=")[1];
+
         const response = await fetch("/api/assessments/bulk-generate", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(csrfToken ? { "x-csrf-token": decodeURIComponent(csrfToken) } : {}),
+          },
           body: JSON.stringify({
             scope,
             category,

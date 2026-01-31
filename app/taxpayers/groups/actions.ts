@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getUserWithCommune } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { assertCsrfToken } from "@/lib/csrf";
 
 const groupSchema = z.object({
   name: z.string().min(2),
@@ -56,6 +57,7 @@ async function resolveCommuneIds(communeIds: string[]) {
 }
 
 export async function createTaxpayerGroup(formData: FormData) {
+  await assertCsrfToken(formData);
   const { isSuperAdmin, scopedCommuneId } = await resolveScopedContext();
   const raw = Object.fromEntries(formData.entries()) as Record<string, FormDataEntryValue>;
   const parsed = groupSchema.safeParse({
@@ -110,6 +112,7 @@ export async function createTaxpayerGroup(formData: FormData) {
 }
 
 export async function updateTaxpayerGroup(formData: FormData) {
+  await assertCsrfToken(formData);
   const { isSuperAdmin, scopedCommuneId } = await resolveScopedContext();
   const raw = Object.fromEntries(formData.entries()) as Record<string, FormDataEntryValue>;
   const id = getString(raw.id);
@@ -175,6 +178,7 @@ export async function updateTaxpayerGroup(formData: FormData) {
 }
 
 export async function deleteTaxpayerGroup(formData: FormData) {
+  await assertCsrfToken(formData);
   const { scopedCommuneId } = await resolveScopedContext();
   const id = getString(formData.get("id") ?? "");
   if (!id) throw new Error("Identifiant manquant");

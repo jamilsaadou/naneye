@@ -1,24 +1,16 @@
 "use server";
 
 import { z } from "zod";
-import { randomUUID } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession, getUserWithCommune } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { assertCsrfToken } from "@/lib/csrf";
+import { storeUpload, UploadPresets } from "@/lib/uploads";
 
 async function storePaymentProof(file: File) {
-  const uploadDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadDir, { recursive: true });
-  const safeName = file.name ? file.name.replace(/[^a-zA-Z0-9._-]/g, "_") : "preuve";
-  const filename = `${randomUUID()}-${safeName}`;
-  const filePath = path.join(uploadDir, filename);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(filePath, buffer);
-  return `/uploads/${filename}`;
+  return storeUpload(file, UploadPresets.proof);
 }
 
 const paymentSchema = z.object({
@@ -29,6 +21,7 @@ const paymentSchema = z.object({
 });
 
 export async function createManualPayment(formData: FormData) {
+  await assertCsrfToken(formData);
   const session = await getSession();
   if (!session || (session.role !== "SUPER_ADMIN" && session.role !== "ADMIN" && session.role !== "CAISSIER")) {
     throw new Error("Acces refuse");

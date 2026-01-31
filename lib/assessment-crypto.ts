@@ -3,10 +3,23 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypt
 const ALGO = "aes-256-gcm" as const;
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
+const DEFAULT_SECRET = "dev-assessment-secret-change";
+const MIN_SECRET_LENGTH = 32;
+
+function isProd() {
+  return process.env.NODE_ENV === "production";
+}
+
+function getSecret() {
+  const secret = process.env.ASSESSMENT_LINK_SECRET ?? DEFAULT_SECRET;
+  if (isProd() && (secret === DEFAULT_SECRET || secret.length < MIN_SECRET_LENGTH)) {
+    throw new Error("ASSESSMENT_LINK_SECRET manquant ou trop court en production.");
+  }
+  return secret;
+}
 
 function getKey() {
-  const secret = process.env.ASSESSMENT_LINK_SECRET ?? "dev-assessment-secret-change";
-  return createHash("sha256").update(secret).digest();
+  return createHash("sha256").update(getSecret()).digest();
 }
 
 function toBase64Url(buffer: Buffer) {
