@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Taxpayer" ALTER COLUMN "status" SET DEFAULT 'EN_ATTENTE';

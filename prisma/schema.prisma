@@ -1,0 +1,385 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  AGENT
+  CAISSIER
+  AUDITEUR
+}
+
+enum NoticeReductionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NoticeStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum TaxpayerStatus {
+  EN_ATTENTE
+  ACTIVE
+  ARCHIVED
+}
+
+enum CollectorStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  name         String?
+  passwordHash String
+  role         Role      @default(AGENT)
+  enabledModules String[] @default([])
+  communeId    String?
+  supervisorId String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  commune        Commune?   @relation(fields: [communeId], references: [id])
+  supervisor     User?      @relation("UserSupervisor", fields: [supervisorId], references: [id])
+  subordinates   User[]     @relation("UserSupervisor")
+  createdPayments Payment[]
+  audits          AuditLog[] @relation("AuditActor")
+  noticeReductions NoticeReduction[]
+  reviewedReductions NoticeReduction[] @relation("ReductionReviewedBy")
+
+  @@index([role])
+  @@index([communeId])
+  @@index([supervisorId])
+}
+
+model Commune {
+  id        String        @id @default(uuid())
+  name      String        @unique
+  code      String?       @unique
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  neighborhoods Neighborhood[]
+  users        User[]
+  taxpayerGroups TaxpayerGroup[]
+}
+
+model Neighborhood {
+  id        String   @id @default(uuid())
+  name      String
+  communeId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  commune   Commune  @relation(fields: [communeId], references: [id], onDelete: Cascade)
+
+  @@unique([communeId, name])
+  @@index([communeId])
+}
+
+model Taxpayer {
+  id           String         @id @default(uuid())
+  code         String?        @unique
+  name         String
+  category     String?
+  neighborhood String
+  commune      String
+  status       TaxpayerStatus @default(EN_ATTENTE)
+  groupId      String?
+  address      String?
+  phone        String
+  email        String?
+  photoUrl     String?
+  comment      String?
+  latitude     Decimal?       @db.Decimal(10, 6)
+  longitude    Decimal?       @db.Decimal(10, 6)
+  startedAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  group      TaxpayerGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  notices    Notice[]
+  measures   TaxpayerMeasure[]
+  photos     TaxpayerPhoto[]
+  reductions NoticeReduction[]
+
+  @@index([name])
+  @@index([category])
+  @@index([neighborhood])
+  @@index([commune])
+  @@index([phone])
+  @@index([status])
+  @@index([groupId])
+}
+
+model TaxpayerGroup {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isGlobal    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  communes    Commune[]
+  taxpayers   Taxpayer[]
+
+  @@index([name])
+}
+
+model TaxpayerPhoto {
+  id         String   @id @default(uuid())
+  taxpayerId String
+  url        String
+  createdAt  DateTime @default(now())
+
+  taxpayer   Taxpayer @relation(fields: [taxpayerId], references: [id], onDelete: Cascade)
+
+  @@index([taxpayerId])
+}
+
+model Tax {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  label     String
+  rate      Decimal  @db.Decimal(10, 4)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rules       TaxRule[]
+  noticeLines NoticeLine[]
+  measures    TaxpayerMeasure[]
+
+  @@index([active])
+}
+
+model TaxpayerCategory {
+  id               String   @id @default(uuid())
+  label            String   @unique
+  code             String?  @unique
+  sanitationAmount Decimal  @db.Decimal(14, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model TaxpayerMeasure {
+  id         String   @id @default(uuid())
+  taxpayerId String
+  taxId      String
+  quantity   Decimal  @db.Decimal(14, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  taxpayer   Taxpayer @relation(fields: [taxpayerId], references: [id], onDelete: Cascade)
+  tax        Tax      @relation(fields: [taxId], references: [id], onDelete: Cascade)
+
+  @@unique([taxpayerId, taxId])
+  @@index([taxpayerId])
+  @@index([taxId])
+}
+
+model TaxRule {
+  id           String   @id @default(uuid())
+  taxId        String
+  commune      String?
+  neighborhood String?
+  category     String?
+  zone         String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tax          Tax      @relation(fields: [taxId], references: [id])
+
+  @@index([taxId])
+  @@index([active])
+  @@index([commune])
+  @@index([neighborhood])
+  @@index([category])
+  @@index([zone])
+}
+
+model Notice {
+  id           String       @id @default(uuid())
+  number       String       @unique
+  taxpayerId   String
+  year         Int
+  periodStart  DateTime
+  periodEnd    DateTime
+  totalAmount  Decimal      @db.Decimal(14, 2)
+  amountPaid   Decimal      @db.Decimal(14, 2) @default(0)
+  status       NoticeStatus @default(UNPAID)
+  locked       Boolean      @default(false)
+  lockedAt     DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  taxpayer     Taxpayer     @relation(fields: [taxpayerId], references: [id])
+  lines        NoticeLine[]
+  payments     Payment[]
+  reductions   NoticeReduction[]
+
+  @@index([taxpayerId])
+  @@unique([taxpayerId, year])
+  @@index([year])
+  @@index([periodStart, periodEnd])
+  @@index([status])
+}
+
+model NoticeReduction {
+  id           String   @id @default(uuid())
+  noticeId     String
+  taxpayerId   String
+  amount       Decimal  @db.Decimal(14, 2)
+  previousTotal Decimal @db.Decimal(14, 2)
+  newTotal     Decimal  @db.Decimal(14, 2)
+  reason       String?
+  status       NoticeReductionStatus @default(APPROVED)
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewNote   String?
+  createdAt    DateTime @default(now())
+  createdById  String
+
+  notice       Notice   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  taxpayer     Taxpayer @relation(fields: [taxpayerId], references: [id])
+  createdBy    User     @relation(fields: [createdById], references: [id])
+  reviewedBy   User?    @relation("ReductionReviewedBy", fields: [reviewedById], references: [id])
+
+  @@index([noticeId])
+  @@index([taxpayerId])
+  @@index([createdById])
+  @@index([status])
+  @@index([reviewedById])
+}
+
+model NoticeLine {
+  id          String   @id @default(uuid())
+  noticeId    String
+  taxId       String?
+  taxCode     String
+  taxLabel    String
+  taxRate     Decimal  @db.Decimal(10, 4)
+  baseAmount  Decimal  @db.Decimal(14, 2) @default(0)
+  amount      Decimal  @db.Decimal(14, 2)
+  createdAt   DateTime @default(now())
+
+  notice      Notice   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  tax         Tax?     @relation(fields: [taxId], references: [id])
+
+  @@index([noticeId])
+  @@index([taxId])
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  noticeId    String
+  collectorId String?
+  externalTxnId String?     @unique
+  amount      Decimal       @db.Decimal(14, 2)
+  method      String        @default("CASH")
+  proofUrl    String?
+  paidAt      DateTime      @default(now())
+  createdById String
+  createdAt   DateTime      @default(now())
+
+  notice      Notice        @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  collector   Collector?    @relation(fields: [collectorId], references: [id])
+  createdBy   User          @relation(fields: [createdById], references: [id])
+
+  @@index([noticeId])
+  @@index([collectorId])
+  @@index([paidAt])
+}
+
+model Collector {
+  id        String          @id @default(uuid())
+  code      String          @unique
+  name      String
+  phone     String
+  email     String?
+  jwtSecret String?
+  status    CollectorStatus @default(ACTIVE)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  payments  Payment[]
+  apiLogs   CollectorApiLog[]
+
+  @@index([status])
+  @@index([name])
+}
+
+model CollectorApiLog {
+  id            String   @id @default(uuid())
+  collectorId   String?
+  noticeNumber  String?
+  requestTxnId  String?
+  jwtTxnId      String?
+  jwtIssuer     String?
+  status        String
+  message       String?
+  requestPayload  Json?
+  responsePayload Json?
+  createdAt     DateTime @default(now())
+
+  collector     Collector? @relation(fields: [collectorId], references: [id])
+
+  @@index([collectorId])
+  @@index([requestTxnId])
+  @@index([jwtTxnId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AppSetting {
+  id               String   @id @default(uuid())
+  municipalityName String
+  municipalityLogo String?
+  primaryColor     String?
+  backgroundColor  String?
+  foregroundColor  String?
+  mutedColor       String?
+  borderColor      String?
+  apiBaseUrl       String?
+  defaultCurrency  String   @default("XOF")
+  timezone         String   @default("Africa/Niamey")
+  receiptFooter    String?
+  assessmentHeader String?  @db.Text
+  assessmentFooter String?  @db.Text
+  smtpHost         String?
+  smtpPort         Int?
+  smtpUser         String?
+  smtpPassword     String?
+  smtpFrom         String?
+  smtpSecure       Boolean? @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

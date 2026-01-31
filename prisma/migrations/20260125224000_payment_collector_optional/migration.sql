@@ -1,0 +1,1 @@
+ALTER TABLE "Payment" ALTER COLUMN "collectorId" DROP NOT NULL;
