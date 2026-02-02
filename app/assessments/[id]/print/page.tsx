@@ -22,10 +22,26 @@ export default async function AssessmentPrintPage({
     return <div className="p-6 text-sm text-muted-foreground">Avis introuvable.</div>;
   }
 
+  // Contenu du QR code avec les informations de l'avis
+  const totalAmount = Number(notice.totalAmount);
+  const amountPaid = Number(notice.amountPaid);
+  const remainingAmount = totalAmount - amountPaid;
+  const formatAmount = (v: number) => v.toLocaleString("fr-FR");
+
+  const qrContent = [
+    `AVIS: ${notice.number}`,
+    `NOM: ${notice.taxpayer.name}`,
+    `CODE: ${notice.taxpayer.code ?? "-"}`,
+    `TOTAL: ${formatAmount(totalAmount)} FCFA`,
+    `PAYE: ${formatAmount(amountPaid)} FCFA`,
+    `RESTE: ${formatAmount(remainingAmount)} FCFA`,
+  ].join("\n");
+  const qrSvg = await renderQrSvg(qrContent);
+
+  // URL digitale (non utilisée dans le QR mais passée au composant)
   const baseUrl = process.env.APP_URL ?? "http://localhost:3000";
   const token = encryptAssessmentToken(notice.id);
   const digitalUrl = `${baseUrl}/assessments/digital?token=${token}`;
-  const qrSvg = await renderQrSvg(digitalUrl);
 
   return (
     <>

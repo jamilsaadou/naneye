@@ -1,10 +1,12 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { decryptSecret, isEncrypted } from "@/lib/encryption";
 
 export type CollectorJwtPayload = {
   iss?: string;
   exp?: number;
   iat?: number;
+  nbf?: number;
   txnId?: string;
   [key: string]: unknown;
 };
@@ -53,6 +55,17 @@ function verifyJwtHs256(token: string, secret: string) {
 
   const payload = JSON.parse(base64UrlDecode(payloadPart)) as CollectorJwtPayload;
   const now = Math.floor(Date.now() / 1000);
+
+  // Vérifier que le token n'est pas émis dans le futur (tolérance de 60s pour décalage d'horloge)
+  if (payload.iat && payload.iat > now + 60) {
+    throw new Error("JWT invalide");
+  }
+
+  // Vérifier la date de début de validité (nbf = not before)
+  if (payload.nbf && payload.nbf > now) {
+    throw new Error("JWT pas encore valide");
+  }
+
   if (payload.exp && payload.exp < now) {
     throw new Error("JWT expire");
   }
@@ -80,7 +93,12 @@ export async function verifyCollectorRequest(token: string | null, requestTxnId?
     throw new Error("JWT secret manquant pour ce collecteur");
   }
 
-  const payload = verifyJwtHs256(raw, collector.jwtSecret);
+  // Déchiffrer le secret s'il est chiffré
+  const secret = isEncrypted(collector.jwtSecret)
+    ? decryptSecret(collector.jwtSecret)
+    : collector.jwtSecret;
+
+  const payload = verifyJwtHs256(raw, secret);
   if (requestTxnId && payload.txnId && payload.txnId !== requestTxnId) {
     throw new Error("txnId non conforme");
   }

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { sendCollectorCredentials, sendCollectorResetCredentials } from "@/lib/smtp";
 import { assertCsrfToken } from "@/lib/csrf";
+import { encryptSecret } from "@/lib/encryption";
 
 const statusSchema = z.enum(["ACTIVE", "SUSPENDED"]);
 
@@ -46,6 +47,7 @@ export async function createCollector(formData: FormData) {
   }
 
   const password = generateCollectorPassword();
+  const encryptedSecret = encryptSecret(password);
 
   const collector = await prisma.collector.create({
     data: {
@@ -54,7 +56,7 @@ export async function createCollector(formData: FormData) {
       phone: parsed.data.phone,
       email: parsed.data.email,
       status: parsed.data.status,
-      jwtSecret: password,
+      jwtSecret: encryptedSecret,
     },
   });
 
@@ -141,11 +143,12 @@ export async function resetCollectorCredentials(formData: FormData) {
   }
 
   const password = generateCollectorPassword();
+  const encryptedSecret = encryptSecret(password);
   const previousSecret = collector.jwtSecret ?? null;
 
   await prisma.collector.update({
     where: { id },
-    data: { jwtSecret: password },
+    data: { jwtSecret: encryptedSecret },
   });
 
   try {

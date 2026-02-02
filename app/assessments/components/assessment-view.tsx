@@ -108,14 +108,16 @@ export function AssessmentView({
           {title}
         </div>
 
-        <div className="assessment-content grid gap-3 px-6 py-4 [grid-template-columns:1.05fr_1fr] text-[11px] leading-5">
+        <div className="assessment-content grid gap-3 px-6 py-4 [grid-template-columns:1.05fr_1fr] text-[10px] leading-4">
           <div className="rounded-md border border-emerald-200 px-3 py-2">
             <div className="mb-2 text-center font-semibold text-emerald-800">Informations sur le contribuable</div>
             <div className="grid gap-1">
               {infoRow("Designation du contribuable :", taxpayer.name)}
               {infoRow("Secteur d'activite :", taxpayer.category ?? "-")}
               {infoRow("Telephone :", taxpayer.phone ?? "-")}
-              {infoRow("Adresse :", taxpayer.address ?? taxpayer.commune)}
+              {infoRow("Adresse :", taxpayer.address ?? "-")}
+              {infoRow("Arrondissement communal :", taxpayer.commune)}
+              {infoRow("Quartier :", taxpayer.neighborhood ?? "-")}
             </div>
           </div>
 
@@ -128,7 +130,6 @@ export function AssessmentView({
               {infoRow("Date d'exigibilite :", formatDate(notice.periodStart))}
               {infoRow("Date de majoration :", "-")}
               {infoRow("Date de mise en recouvrement :", formatDate(notice.createdAt))}
-              {infoRow("Arrondissement communal :", taxpayer.neighborhood)}
             </div>
           </div>
         </div>
@@ -138,7 +139,7 @@ export function AssessmentView({
             Articles 2 et 3 de la Loi n° 2012 - 37 du 20 Juin 2012, portant Code General des impots
           </div>
           <div className="mt-3 overflow-hidden rounded-md border border-emerald-700">
-            <table className="w-full table-fixed text-[11px] leading-4">
+            <table className="w-full table-fixed text-[10px] leading-4">
               <thead className="bg-emerald-800 text-white">
                 <tr>
                   <th className="w-[38%] px-3 py-2 text-left">Nature des contributions et taxes</th>
@@ -185,16 +186,16 @@ export function AssessmentView({
 
         <div className="assessment-bottom">
           <div className="mt-6 border-t border-slate-200 px-8 py-4 text-xs">
-            <div className="mx-auto grid w-[100mm] grid-cols-[1fr_12mm] items-center gap-[1.5mm]">
-              <div className="min-w-0 space-y-1">
-                <div>Numero d&apos;avis d&apos;imposition : {notice.number}</div>
-                <div>Date de generation : {formatDate(notice.createdAt)}</div>
-                <div>Heure : {formatTime(notice.createdAt)}</div>
-                <div>Arrondissement communal : {taxpayer.neighborhood}</div>
-                <div className="text-[10px] text-slate-500">Version digitale via QR.</div>
+            <div className="mx-auto grid w-[100mm] grid-cols-[1fr_18mm] items-center gap-[2mm]">
+              <div className="min-w-0 space-y-0.5 text-[9px]">
+                <div>Numero d&apos;avis : {notice.number}</div>
+                <div>Date : {formatDate(notice.createdAt)} - {formatTime(notice.createdAt)}</div>
+                <div>Arrondissement : {taxpayer.commune}</div>
+                <div>Quartier : {taxpayer.neighborhood}</div>
+                <div className="text-[8px] text-slate-500">Version digitale via QR.</div>
               </div>
               <div
-                className="qr-box h-[12mm] w-[12mm] justify-self-start overflow-hidden rounded border border-slate-200 bg-white p-[0.5mm]"
+                className="qr-box h-[18mm] w-[18mm] justify-self-start overflow-hidden rounded border border-slate-200 bg-white p-[0.5mm]"
                 dangerouslySetInnerHTML={{ __html: qrSvg }}
               />
             </div>

@@ -3,18 +3,26 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyCollectorRequest } from "@/lib/collector-api";
+import { checkRateLimit, COLLECTOR_API_RATE_LIMIT } from "@/lib/rate-limit";
+
+const MAX_STRING_LENGTH = 100;
 
 const paymentSchema = z.object({
-  noticeNumber: z.string().min(3),
-  taxpayerCode: z.string().min(2),
-  AmountCollected: z.number().positive(),
-  ReferenceID: z.string().min(1),
-  DateofPayment: z.number().int().positive(),
+  noticeNumber: z.string().min(3, "l'avis doit avoir au moins 3 caracteres").max(MAX_STRING_LENGTH),
+  taxpayerCode: z.string().min(2, "le code contribuable doit avoir au moins 2 caracteres").max(MAX_STRING_LENGTH),
+  AmountCollected: z.number().positive("le montant doit etre positif").max(999_999_999_999),
+  ReferenceID: z.string().min(1, "ReferenceID est requis").max(MAX_STRING_LENGTH),
+  DateofPayment: z.number().int().positive("DateofPayment doit etre un timestamp valide"),
 });
 
 const paymentLookupSchema = z.object({
-  noticeNumber: z.string().min(3),
+  noticeNumber: z.string().min(3, "l'avis doit avoir au moins 3 caracteres").max(MAX_STRING_LENGTH),
 });
+
+function formatZodError(error: z.ZodError): string {
+  const messages = error.errors.map((e) => e.message);
+  return `Donnees invalides: ${messages.join(", ")}`;
+}
 
 async function getSystemUserId() {
   const email = "system@taxes.local";
@@ -25,6 +33,9 @@ async function getSystemUserId() {
   });
   return user.id;
 }
+
+// Message combiné pour éviter l'énumération tout en restant clair
+const NOTICE_NOT_FOUND_ERROR = "Avis introuvable ou code contribuable incorrect";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -40,13 +51,19 @@ export async function GET(request: Request) {
 
   try {
     if (!parsed.success) {
-      throw new Error("noticeNumber manquant");
+      throw new Error(formatZodError(parsed.error));
     }
 
     const { payload, collector } = await verifyCollectorRequest(authHeader, null);
     collectorId = collector.id;
     jwtTxnId = payload.txnId ?? null;
     jwtIssuer = payload.iss ?? null;
+
+    // Rate limiting par collecteur
+    const rateLimit = checkRateLimit(`collector:${collector.id}`, COLLECTOR_API_RATE_LIMIT);
+    if (!rateLimit.allowed) {
+      throw new Error("Trop de requetes, reessayez plus tard");
+    }
 
     const notice = await prisma.notice.findFirst({
       where: { number: parsed.data.noticeNumber },
@@ -134,7 +151,7 @@ export async function POST(request: Request) {
 
   try {
     if (!parsed.success) {
-      throw new Error("Donnees invalides");
+      throw new Error(formatZodError(parsed.error));
     }
 
     const { payload, collector } = await verifyCollectorRequest(authHeader, null);
@@ -142,16 +159,25 @@ export async function POST(request: Request) {
     jwtTxnId = payload.txnId ?? null;
     jwtIssuer = payload.iss ?? null;
 
+    // Rate limiting par collecteur
+    const rateLimit = checkRateLimit(`collector:${collector.id}`, COLLECTOR_API_RATE_LIMIT);
+    if (!rateLimit.allowed) {
+      throw new Error("Trop de requetes, reessayez plus tard");
+    }
+
     const notice = await prisma.notice.findFirst({
       where: { number: parsed.data.noticeNumber },
       include: { taxpayer: true },
     });
-    if (!notice) {
-      throw new Error("Avis introuvable");
+
+    // Message combiné pour éviter l'énumération (ne pas révéler si l'avis existe)
+    if (!notice || !notice.taxpayer.code || notice.taxpayer.code !== parsed.data.taxpayerCode) {
+      throw new Error(NOTICE_NOT_FOUND_ERROR);
     }
 
-    if (!notice.taxpayer.code || notice.taxpayer.code !== parsed.data.taxpayerCode) {
-      throw new Error("Contribuable non conforme");
+    // Vérifier que l'avis n'est pas déjà entièrement payé
+    if (notice.status === "PAID") {
+      throw new Error("Avis deja entierement paye");
     }
 
     const existing = await prisma.payment.findFirst({ where: { externalTxnId: parsed.data.ReferenceID } });
@@ -177,6 +203,12 @@ export async function POST(request: Request) {
     const paidAt = new Date(parsed.data.DateofPayment);
     if (Number.isNaN(paidAt.getTime())) {
       throw new Error("DateofPayment invalide");
+    }
+
+    // Vérifier que le montant ne dépasse pas le solde restant à payer
+    const remaining = new Prisma.Decimal(notice.totalAmount).sub(new Prisma.Decimal(notice.amountPaid));
+    if (paymentAmount.gt(remaining)) {
+      throw new Error("Montant superieur au solde a payer");
     }
 
     const updated = await prisma.$transaction(async (tx) => {
