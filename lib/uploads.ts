@@ -2,6 +2,9 @@ import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
+// Réexporter pour la compatibilité avec les imports existants côté serveur
+export { normalizeUploadUrl } from "./upload-utils";
+
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -42,15 +45,6 @@ export async function storeUpload(file: File, options: UploadOptions) {
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(filePath, buffer);
   return `/api/uploads/${filename}`;
-}
-
-/** Convertit les anciennes URLs /uploads/ vers /api/uploads/ */
-export function normalizeUploadUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  if (url.startsWith("/uploads/")) {
-    return url.replace("/uploads/", "/api/uploads/");
-  }
-  return url;
 }
 
 export const UploadPresets = {

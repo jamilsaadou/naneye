@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { normalizeUploadUrl } from "@/lib/uploads";
+import { normalizeUploadUrl } from "@/lib/upload-utils";
 
 export type TaxpayerModalNotice = {
   number: string;
