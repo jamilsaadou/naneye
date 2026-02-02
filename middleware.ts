@@ -23,6 +23,7 @@ const PUBLIC_PATHS = [
 function isPublicPath(pathname: string) {
   if (PUBLIC_PATHS.some((path) => pathname === path)) return true;
   if (pathname.startsWith("/api/collector")) return true;
+  if (pathname.startsWith("/api/uploads")) return true;
   if (pathname.startsWith("/_next")) return true;
   if (pathname.startsWith("/uploads")) return true;
   if (pathname === "/favicon.ico") return true;
