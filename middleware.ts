@@ -61,7 +61,7 @@ export async function middleware(request: NextRequest) {
     response.cookies.set({
       name: CSRF_COOKIE_NAME,
       value: generateCsrfToken(),
-      ...getCsrfCookieOptions(),
+      ...getCsrfCookieOptions(request.headers),
     });
   }
 
