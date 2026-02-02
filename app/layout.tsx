@@ -10,6 +10,7 @@ import { MODULE_IDS } from "@/lib/modules";
 import { prisma } from "@/lib/prisma";
 import { hslString, pickForeground } from "@/lib/colors";
 import { CsrfTokenField } from "@/components/ui/csrf-token-field";
+import { normalizeUploadUrl } from "@/lib/uploads";
 
 const plexSans = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -50,7 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   {settings?.municipalityLogo ? (
                     <div className="mt-4 flex items-center justify-center">
                       <Image
-                        src={settings.municipalityLogo}
+                        src={normalizeUploadUrl(settings.municipalityLogo) ?? settings.municipalityLogo}
                         alt="Logo commune"
                         width={160}
                         height={80}
@@ -156,7 +157,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   {settings?.municipalityLogo ? (
                     <div className="mt-4 flex items-center justify-center">
                       <Image
-                        src={settings.municipalityLogo}
+                        src={normalizeUploadUrl(settings.municipalityLogo) ?? settings.municipalityLogo}
                         alt="Logo commune"
                         width={192}
                         height={96}

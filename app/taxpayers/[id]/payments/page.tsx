@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ManualPaymentForm } from "./manual-payment-form";
+import { normalizeUploadUrl } from "@/lib/uploads";
 
 function formatNumber(value: number) {
   const formatted = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(value);
@@ -105,13 +106,13 @@ export default async function TaxpayerPaymentsPage({ params }: { params: Promise
                   <TableCell>
                     {payment.proofUrl ? (
                       <a
-                        href={payment.proofUrl}
+                        href={normalizeUploadUrl(payment.proofUrl) ?? payment.proofUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-2 text-xs text-emerald-700 hover:underline"
                       >
                         <Image
-                          src={payment.proofUrl}
+                          src={normalizeUploadUrl(payment.proofUrl) ?? payment.proofUrl}
                           alt="Preuve"
                           width={32}
                           height={32}

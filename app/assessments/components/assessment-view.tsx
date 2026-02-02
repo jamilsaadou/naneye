@@ -1,5 +1,6 @@
 import { AppSetting, Notice, NoticeLine, Taxpayer } from "@prisma/client";
 import Image from "next/image";
+import { normalizeUploadUrl } from "@/lib/uploads";
 
 function formatNumber(value: number) {
   const formatted = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(value);
@@ -20,10 +21,11 @@ function formatTime(value: Date) {
 
 function renderTemplateImage(value: string | null, heightMm: number) {
   if (!value) return null;
+  const src = normalizeUploadUrl(value) ?? value;
   return (
     <div className="relative w-full" style={{ height: `${heightMm}mm` }}>
       <Image
-        src={value}
+        src={src}
         alt="Template"
         fill
         sizes="100vw"
@@ -74,7 +76,7 @@ export function AssessmentView({
               <div className="flex items-center gap-4">
                 {settings?.municipalityLogo ? (
                   <Image
-                    src={settings.municipalityLogo}
+                    src={normalizeUploadUrl(settings.municipalityLogo) ?? settings.municipalityLogo}
                     alt="Logo"
                     width={64}
                     height={64}
@@ -90,7 +92,7 @@ export function AssessmentView({
               </div>
               {settings?.municipalityLogo ? (
                 <Image
-                  src={settings.municipalityLogo}
+                  src={normalizeUploadUrl(settings.municipalityLogo) ?? settings.municipalityLogo}
                   alt="Logo"
                   width={64}
                   height={64}

@@ -5,15 +5,17 @@ import { ActionForm } from "@/components/ui/action-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { updateAssessmentTemplate } from "./actions";
+import { normalizeUploadUrl } from "@/lib/uploads";
 
 function renderTemplate(value: string | null, heightMm: number) {
   if (!value) {
     return <div className="text-xs text-slate-400 italic">Aucune image definie</div>;
   }
+  const src = normalizeUploadUrl(value) ?? value;
   return (
     <div className="relative w-full" style={{ height: `${heightMm}mm` }}>
       <Image
-        src={value}
+        src={src}
         alt="Template"
         fill
         sizes="100vw"

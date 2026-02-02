@@ -41,7 +41,16 @@ export async function storeUpload(file: File, options: UploadOptions) {
   const filePath = path.join(UPLOAD_DIR, filename);
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(filePath, buffer);
-  return `/uploads/${filename}`;
+  return `/api/uploads/${filename}`;
+}
+
+/** Convertit les anciennes URLs /uploads/ vers /api/uploads/ */
+export function normalizeUploadUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("/uploads/")) {
+    return url.replace("/uploads/", "/api/uploads/");
+  }
+  return url;
 }
 
 export const UploadPresets = {

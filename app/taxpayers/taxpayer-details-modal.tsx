@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
+import { normalizeUploadUrl } from "@/lib/uploads";
 
 export type TaxpayerModalNotice = {
   number: string;
@@ -90,6 +91,11 @@ export function TaxpayerDetailsModal({
     const date = new Date(taxpayer.startedAt);
     return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString("fr-FR");
   }, [taxpayer.startedAt]);
+
+  const normalizedPhotoUrls = useMemo(
+    () => taxpayer.photoUrls.map((url) => normalizeUploadUrl(url) ?? url),
+    [taxpayer.photoUrls]
+  );
 
   return (
     <>
@@ -207,7 +213,7 @@ export function TaxpayerDetailsModal({
                             </div>
                             {payment.proofUrl ? (
                               <a
-                                href={payment.proofUrl}
+                                href={normalizeUploadUrl(payment.proofUrl) ?? payment.proofUrl}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-xs text-emerald-700 hover:underline"
@@ -308,8 +314,8 @@ export function TaxpayerDetailsModal({
                 <div className="rounded-2xl border border-white/40 bg-white/75 p-4">
                   <div className="text-sm font-semibold text-slate-900">Photos</div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    {taxpayer.photoUrls.length > 0 ? (
-                      taxpayer.photoUrls.map((url, index) => (
+                    {normalizedPhotoUrls.length > 0 ? (
+                      normalizedPhotoUrls.map((url, index) => (
                         <button
                           type="button"
                           key={`${url}-${index}`}
