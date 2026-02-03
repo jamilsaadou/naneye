@@ -7,7 +7,6 @@ import { ActionForm } from "@/components/ui/action-form";
 import { createManualPaymentFromLookup, lookupPaymentInfo } from "./actions";
 
 const METHODS = [
-  { value: "CASH", label: "Especes" },
   { value: "TRANSFER", label: "Virement" },
   { value: "CHEQUE", label: "Cheque" },
 ] as const;
@@ -30,7 +29,7 @@ export function PaymentFlow({ defaultCode = "", defaultNotice = "" }: { defaultC
   const [step, setStep] = useState<"lookup" | "pay">("lookup");
   const [payload, setPayload] = useState<LookupPayload | null>(null);
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<(typeof METHODS)[number]["value"]>("CASH");
+  const [method, setMethod] = useState<(typeof METHODS)[number]["value"]>("TRANSFER");
 
   const remaining = payload
     ? Math.max(0, payload.notice.totalAmount - payload.notice.amountPaid)

@@ -127,7 +127,7 @@ export default async function DashboardPage({
     }),
   ]);
 
-  const [taxpayersByCategory, taxpayersByCommune, noticeTotals] = await Promise.all([
+  const [taxpayersByCategory, taxpayersByCommune, noticeTotals, taxDistribution] = await Promise.all([
     prisma.taxpayer.groupBy({
       by: ["category"],
       _count: { _all: true },
@@ -147,6 +147,17 @@ export default async function DashboardPage({
         totalAmount: true,
         taxpayer: { select: { category: true, commune: true } },
       },
+    }),
+    prisma.noticeLine.groupBy({
+      by: ["taxLabel"],
+      _sum: { amount: true },
+      where: {
+        notice: {
+          year: selectedYear,
+          ...(scopedNoticeWhere ?? {}),
+        },
+      },
+      orderBy: { _sum: { amount: "desc" } },
     }),
   ]);
 
@@ -224,6 +235,20 @@ export default async function DashboardPage({
   const maxCategoryTotal = Math.max(1, ...categoryRows.map((row) => row.total));
   const maxCommuneCount = Math.max(1, ...communeRows.map((row) => row.count));
   const maxCommuneTotal = Math.max(1, ...communeRows.map((row) => row.total));
+
+  // Répartition par type de taxe
+  const taxColors = ["#16a34a", "#0ea5e9", "#8b5cf6", "#f59e0b", "#ef4444", "#ec4899", "#14b8a6", "#64748b"];
+  const taxRows = taxDistribution
+    .map((row, index) => ({
+      label: row.taxLabel,
+      amount: Number(row._sum.amount ?? 0),
+      color: taxColors[index % taxColors.length],
+    }))
+    .filter((row) => row.amount > 0);
+  const totalTaxAmount = taxRows.reduce((sum, row) => sum + row.amount, 0);
+  const taxPieSegments = buildPieSegments(
+    taxRows.map((row) => ({ value: row.amount, color: row.color }))
+  );
 
   return (
     <div className="space-y-6">
@@ -329,7 +354,7 @@ export default async function DashboardPage({
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
             <p className="text-sm text-muted-foreground">Statut des avis</p>
@@ -337,8 +362,8 @@ export default async function DashboardPage({
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-6">
-              <div className="relative h-32 w-32">
-                <svg viewBox="0 0 36 36" className="h-32 w-32">
+              <div className="relative h-28 w-28 shrink-0">
+                <svg viewBox="0 0 36 36" className="h-28 w-28">
                   <circle
                     cx="18"
                     cy="18"
@@ -363,8 +388,8 @@ export default async function DashboardPage({
                   ))}
                 </svg>
               </div>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center justify-between gap-4">
+              <div className="flex-1 space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-slate-600">
                     <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
                     Payé
@@ -373,7 +398,7 @@ export default async function DashboardPage({
                     {formatNumber(statusMap.get("PAID") ?? 0)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-slate-600">
                     <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
                     Partiel
@@ -382,7 +407,7 @@ export default async function DashboardPage({
                     {formatNumber(statusMap.get("PARTIAL") ?? 0)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-slate-600">
                     <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
                     Non payé
@@ -391,13 +416,77 @@ export default async function DashboardPage({
                     {formatNumber(statusMap.get("UNPAID") ?? 0)}
                   </span>
                 </div>
-                <div className="text-xs text-muted-foreground">Total: {formatNumber(statusTotal)}</div>
+                <div className="text-xs text-muted-foreground pt-1 border-t border-slate-100">Total: {formatNumber(statusTotal)}</div>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
+          <CardHeader>
+            <p className="text-sm text-muted-foreground">Par type de taxe</p>
+            <p className="text-lg font-semibold">Répartition des montants</p>
+          </CardHeader>
+          <CardContent>
+            {taxRows.length === 0 ? (
+              <div className="text-sm text-muted-foreground">Aucune donnée disponible.</div>
+            ) : (
+              <div className="flex items-center gap-6">
+                <div className="relative h-28 w-28 shrink-0">
+                  <svg viewBox="0 0 36 36" className="h-28 w-28">
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.9155"
+                      fill="none"
+                      stroke="#e2e8f0"
+                      strokeWidth="4"
+                    />
+                    {taxPieSegments.map((segment, idx) => (
+                      <circle
+                        key={idx}
+                        cx="18"
+                        cy="18"
+                        r="15.9155"
+                        fill="none"
+                        stroke={segment.color}
+                        strokeWidth="4"
+                        strokeDasharray={`${segment.length} ${100 - segment.length}`}
+                        strokeDashoffset={segment.offset}
+                        strokeLinecap="round"
+                      />
+                    ))}
+                  </svg>
+                </div>
+                <div className="flex-1 space-y-1.5 text-sm">
+                  {taxRows.slice(0, 5).map((row) => (
+                    <div key={row.label} className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2 text-slate-600">
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: row.color }}
+                        />
+                        <span className="truncate max-w-[140px]">{row.label}</span>
+                      </span>
+                      <span className="font-semibold text-slate-900 whitespace-nowrap">
+                        {formatNumber(row.amount)}
+                      </span>
+                    </div>
+                  ))}
+                  {taxRows.length > 5 && (
+                    <div className="text-xs text-slate-500">+{taxRows.length - 5} autres taxes</div>
+                  )}
+                  <div className="text-xs text-muted-foreground pt-1 border-t border-slate-100">
+                    Total: {formatMoney(totalTaxAmount)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
           <CardHeader>
             <p className="text-sm text-muted-foreground">Tendance 12 derniers mois</p>
             <p className="text-lg font-semibold">Avis vs paiements</p>
@@ -444,7 +533,6 @@ export default async function DashboardPage({
             </div>
           </CardContent>
         </Card>
-      </div>
 
       <div className={`grid gap-4 ${scopedCommune ? "md:grid-cols-1" : "md:grid-cols-2"}`}>
         <Card>

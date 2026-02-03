@@ -43,7 +43,12 @@ export async function POST(request: Request) {
     const newHash = await hashPassword(parsed.data.password);
     await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: newHash },
+      data: { passwordHash: newHash, lastLoginAt: new Date() },
+    });
+  } else {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
     });
   }
 

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { createManualPayment } from "./actions";
 
 const METHODS = [
-  { value: "CASH", label: "Especes" },
   { value: "TRANSFER", label: "Virement" },
   { value: "CHEQUE", label: "Cheque" },
 ] as const;
@@ -32,7 +31,7 @@ type NoticeOption = {
 export function ManualPaymentForm({ taxpayerId, notices }: { taxpayerId: string; notices: NoticeOption[] }) {
   const [noticeId, setNoticeId] = useState("");
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<(typeof METHODS)[number]["value"]>("CASH");
+  const [method, setMethod] = useState<(typeof METHODS)[number]["value"]>("TRANSFER");
 
   const notice = useMemo(() => notices.find((item) => item.id === noticeId) ?? null, [noticeId, notices]);
   const amountValue = Number(amount.replace(",", "."));

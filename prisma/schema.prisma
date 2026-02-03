@@ -47,6 +47,7 @@ model User {
   enabledModules String[] @default([])
   communeId    String?
   supervisorId String?
+  lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

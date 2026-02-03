@@ -531,7 +531,10 @@ export default async function TaxpayersPage({
                   reductions: reductionsByTaxpayer.get(taxpayer.id) ?? [],
                 };
                 const modalLogs = logsByTaxpayer.get(taxpayer.id) ?? [];
-                const noticeYears = paymentSummary.map((summary) => summary.year);
+                // Ne montrer que les années sans paiements pour la suppression
+                const noticeYearsWithoutPayments = paymentSummary
+                  .filter((summary) => summary.paid === 0)
+                  .map((summary) => summary.year);
                 return (
                   <TableRow key={taxpayer.id}>
                     <TableCell>{taxpayer.code ?? "-"}</TableCell>
@@ -584,7 +587,7 @@ export default async function TaxpayersPage({
                           </Button>
                         ) : null}
                         {canDeleteNotice ? (
-                          <DeleteNoticeModal taxpayerId={taxpayer.id} years={noticeYears} />
+                          <DeleteNoticeModal taxpayerId={taxpayer.id} years={noticeYearsWithoutPayments} />
                         ) : null}
                         {canDeleteTaxpayer ? (
                           <form action={deleteTaxpayer}>

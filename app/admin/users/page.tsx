@@ -15,6 +15,29 @@ const roles = [
   { value: "AUDITEUR", label: "Auditeur" },
 ] as const;
 
+function formatLastLogin(date: Date | null): { text: string; isRecent: boolean } {
+  if (!date) return { text: "Jamais connecté", isRecent: false };
+
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  // Considéré comme "en ligne" si connecté dans les 15 dernières minutes
+  const isRecent = minutes < 15;
+
+  if (minutes < 1) return { text: "À l'instant", isRecent: true };
+  if (minutes < 60) return { text: `Il y a ${minutes} min`, isRecent };
+  if (hours < 24) return { text: `Il y a ${hours}h`, isRecent: false };
+  if (days < 7) return { text: `Il y a ${days}j`, isRecent: false };
+
+  return {
+    text: date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }),
+    isRecent: false
+  };
+}
+
 export default async function AdminUsersPage() {
   const [users, communes] = await Promise.all([
     prisma.user.findMany({ include: { commune: true }, orderBy: { createdAt: "desc" } }),
@@ -88,28 +111,45 @@ export default async function AdminUsersPage() {
                 <TableHead>Nom</TableHead>
                 <TableHead>Rôle</TableHead>
                 <TableHead>Commune</TableHead>
+                <TableHead>Dernière connexion</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.name ?? "-"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{user.role}</Badge>
-                  </TableCell>
-                  <TableCell>{user.commune?.name ?? "-"}</TableCell>
-                  <TableCell>
-                    <Button asChild size="sm" variant="outline">
-                      <a href={`/admin/users/${user.id}`}>Modifier</a>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {users.map((user) => {
+                const loginStatus = formatLastLogin(user.lastLoginAt);
+                return (
+                  <TableRow key={user.id}>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.name ?? "-"}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{user.role}</Badge>
+                    </TableCell>
+                    <TableCell>{user.commune?.name ?? "-"}</TableCell>
+                    <TableCell>
+                      <span className="flex items-center gap-1.5 text-sm">
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            loginStatus.isRecent ? "bg-emerald-500" : "bg-slate-300"
+                          }`}
+                          title={loginStatus.isRecent ? "En ligne" : "Hors ligne"}
+                        />
+                        <span className={loginStatus.isRecent ? "text-emerald-700" : "text-slate-500"}>
+                          {loginStatus.text}
+                        </span>
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Button asChild size="sm" variant="outline">
+                        <a href={`/admin/users/${user.id}`}>Modifier</a>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {users.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
                     Aucun utilisateur trouvé.
                   </TableCell>
                 </TableRow>
