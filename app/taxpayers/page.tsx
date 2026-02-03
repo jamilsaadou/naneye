@@ -536,7 +536,7 @@ export default async function TaxpayersPage({
                   .filter((summary) => summary.paid === 0)
                   .map((summary) => summary.year);
                 return (
-                  <TableRow key={taxpayer.id}>
+                  <TableRow key={taxpayer.id} className={taxpayer.status === STATUS_PENDING ? "bg-amber-50" : ""}>
                     <TableCell>{taxpayer.code ?? "-"}</TableCell>
                     <TableCell>{taxpayer.name}</TableCell>
                     <TableCell>{taxpayer.commune}</TableCell>
