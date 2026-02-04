@@ -40,7 +40,7 @@ function formatLastLogin(date: Date | null): { text: string; isRecent: boolean }
 
 export default async function AdminUsersPage() {
   const [users, communes] = await Promise.all([
-    prisma.user.findMany({ include: { commune: true }, orderBy: { createdAt: "desc" } }),
+    prisma.user.findMany({ include: { commune: true, accessibleCommunes: true }, orderBy: { createdAt: "desc" } }),
     prisma.commune.findMany({ orderBy: { name: "asc" } }),
   ]);
   const supervisors = users.filter((user) => user.role === "SUPER_ADMIN" || user.role === "ADMIN");
@@ -118,6 +118,9 @@ export default async function AdminUsersPage() {
             <TableBody>
               {users.map((user) => {
                 const loginStatus = formatLastLogin(user.lastLoginAt);
+                const communeDisplay = user.accessibleCommunes.length > 0
+                  ? user.accessibleCommunes.map((c) => c.name).join(", ")
+                  : user.commune?.name ?? (user.role === "SUPER_ADMIN" ? "Toutes" : "-");
                 return (
                   <TableRow key={user.id}>
                     <TableCell>{user.email}</TableCell>
@@ -125,7 +128,9 @@ export default async function AdminUsersPage() {
                     <TableCell>
                       <Badge variant="outline">{user.role}</Badge>
                     </TableCell>
-                    <TableCell>{user.commune?.name ?? "-"}</TableCell>
+                    <TableCell className="max-w-[200px]">
+                      <span className="truncate" title={communeDisplay}>{communeDisplay}</span>
+                    </TableCell>
                     <TableCell>
                       <span className="flex items-center gap-1.5 text-sm">
                         <span

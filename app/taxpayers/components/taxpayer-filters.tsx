@@ -38,7 +38,7 @@ type TaxpayerFilterValues = {
 };
 
 type TaxpayerFiltersProps = {
-  scopedCommune?: string | null;
+  accessibleCommunes?: string[] | null; // null = toutes, [] = aucune, [...] = liste
   communeOptions: CommuneOption[];
   neighborhoodOptions: NeighborhoodOption[];
   categoryOptions: CategoryOption[];
@@ -47,14 +47,18 @@ type TaxpayerFiltersProps = {
 };
 
 export function TaxpayerFilters({
-  scopedCommune,
+  accessibleCommunes,
   communeOptions,
   neighborhoodOptions,
   categoryOptions,
   groupOptions,
   initialValues,
 }: TaxpayerFiltersProps) {
-  const [commune, setCommune] = useState(scopedCommune ?? initialValues.commune ?? "");
+  // Si une seule commune accessible, elle est automatiquement sélectionnée
+  const singleCommune = accessibleCommunes && accessibleCommunes.length === 1 ? accessibleCommunes[0] : null;
+  const canSelectCommune = accessibleCommunes === null || (accessibleCommunes && accessibleCommunes.length > 1);
+
+  const [commune, setCommune] = useState(singleCommune ?? initialValues.commune ?? "");
   const [neighborhood, setNeighborhood] = useState(initialValues.neighborhood ?? "");
   const [q, setQ] = useState(initialValues.q ?? "");
   const [status, setStatus] = useState(initialValues.status ?? "");
@@ -62,36 +66,36 @@ export function TaxpayerFilters({
   const [groupId, setGroupId] = useState(initialValues.groupId ?? "");
 
   useEffect(() => {
-    if (scopedCommune) {
-      setCommune(scopedCommune);
+    if (singleCommune) {
+      setCommune(singleCommune);
     }
-  }, [scopedCommune]);
+  }, [singleCommune]);
 
   const filteredNeighborhoods = useMemo(() => {
-    const base = scopedCommune
-      ? neighborhoodOptions.filter((item) => item.communeName === scopedCommune)
+    const base = singleCommune
+      ? neighborhoodOptions.filter((item) => item.communeName === singleCommune)
       : commune
         ? neighborhoodOptions.filter((item) => item.communeName === commune)
         : neighborhoodOptions;
 
     return [...base].sort((a, b) => {
-      if (!scopedCommune && !commune) {
+      if (!singleCommune && !commune) {
         const communeCompare = a.communeName.localeCompare(b.communeName, "fr");
         if (communeCompare !== 0) return communeCompare;
       }
       return a.name.localeCompare(b.name, "fr");
     });
-  }, [commune, neighborhoodOptions, scopedCommune]);
+  }, [commune, neighborhoodOptions, singleCommune]);
 
   const filteredGroups = useMemo(() => {
-    const scope = scopedCommune ?? commune;
+    const scope = singleCommune ?? commune;
     if (scope) {
       return groupOptions.filter(
         (group) => group.isGlobal || group.communes.some((item) => item.name === scope),
       );
     }
     return groupOptions;
-  }, [commune, groupOptions, scopedCommune]);
+  }, [commune, groupOptions, singleCommune]);
 
   useEffect(() => {
     if (!neighborhood) return;
@@ -109,11 +113,11 @@ export function TaxpayerFilters({
     }
   }, [filteredGroups, groupId]);
 
-  const neighborhoodDisabled = Boolean(scopedCommune) ? false : !commune;
+  const neighborhoodDisabled = singleCommune ? false : !commune;
   const groupDisabled = filteredGroups.length === 0;
 
   return (
-    <form className={`grid gap-3 ${scopedCommune ? "md:grid-cols-3" : "md:grid-cols-4"}`} method="get">
+    <form className={`grid gap-3 ${!canSelectCommune ? "md:grid-cols-3" : "md:grid-cols-4"}`} method="get">
       <label className="text-sm font-medium text-slate-900">
         <span className="flex items-center gap-2">
           <Search className="h-4 w-4 text-slate-500" />
@@ -127,14 +131,14 @@ export function TaxpayerFilters({
           className="mt-2 bg-slate-50"
         />
       </label>
-      {scopedCommune ? (
+      {!canSelectCommune ? (
         <label className="text-sm font-medium text-slate-900">
           <span className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-slate-500" />
             Commune
           </span>
           <div className="mt-2 flex h-9 items-center rounded-md border border-border bg-slate-50 px-3 text-sm text-slate-600">
-            {scopedCommune}
+            {singleCommune ?? "Aucune commune"}
           </div>
         </label>
       ) : (
@@ -175,7 +179,7 @@ export function TaxpayerFilters({
           </option>
           {filteredNeighborhoods.map((item) => (
             <option key={item.id} value={item.name}>
-              {!scopedCommune && !commune ? `${item.communeName} · ${item.name}` : item.name}
+              {!singleCommune && !commune ? `${item.communeName} · ${item.name}` : item.name}
             </option>
           ))}
         </select>

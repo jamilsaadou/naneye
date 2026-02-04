@@ -51,13 +51,14 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  commune        Commune?   @relation(fields: [communeId], references: [id])
-  supervisor     User?      @relation("UserSupervisor", fields: [supervisorId], references: [id])
-  subordinates   User[]     @relation("UserSupervisor")
-  createdPayments Payment[]
-  audits          AuditLog[] @relation("AuditActor")
-  noticeReductions NoticeReduction[]
-  reviewedReductions NoticeReduction[] @relation("ReductionReviewedBy")
+  commune             Commune?   @relation("UserPrimaryCommune", fields: [communeId], references: [id])
+  accessibleCommunes  Commune[]  @relation("UserAccessibleCommunes")
+  supervisor          User?      @relation("UserSupervisor", fields: [supervisorId], references: [id])
+  subordinates        User[]     @relation("UserSupervisor")
+  createdPayments     Payment[]
+  audits              AuditLog[] @relation("AuditActor")
+  noticeReductions    NoticeReduction[]
+  reviewedReductions  NoticeReduction[] @relation("ReductionReviewedBy")
 
   @@index([role])
   @@index([communeId])
@@ -71,9 +72,10 @@ model Commune {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
-  neighborhoods Neighborhood[]
-  users        User[]
-  taxpayerGroups TaxpayerGroup[]
+  neighborhoods    Neighborhood[]
+  users            User[]           @relation("UserPrimaryCommune")
+  accessibleByUsers User[]          @relation("UserAccessibleCommunes")
+  taxpayerGroups   TaxpayerGroup[]
 }
 
 model Neighborhood {

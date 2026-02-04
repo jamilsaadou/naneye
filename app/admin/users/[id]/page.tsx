@@ -18,7 +18,7 @@ const roles = [
 export default async function AdminUserDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [user, communes, supervisors] = await Promise.all([
-    prisma.user.findUnique({ where: { id }, include: { commune: true } }),
+    prisma.user.findUnique({ where: { id }, include: { commune: true, accessibleCommunes: true } }),
     prisma.commune.findMany({ orderBy: { name: "asc" } }),
     prisma.user.findMany({
       where: { role: { in: ["SUPER_ADMIN", "ADMIN"] } },
@@ -26,6 +26,7 @@ export default async function AdminUserDetailsPage({ params }: { params: Promise
       orderBy: { createdAt: "desc" },
     }),
   ]);
+  const accessibleCommuneIds = new Set(user?.accessibleCommunes?.map((c) => c.id) ?? []);
 
   if (!user) {
     return <div className="text-sm text-muted-foreground">Utilisateur introuvable.</div>;
@@ -79,13 +80,13 @@ export default async function AdminUserDetailsPage({ params }: { params: Promise
               </select>
             </label>
             <label className="text-sm font-medium text-slate-900">
-              Commune d&apos;accès
+              Commune principale
               <select
                 name="communeId"
                 defaultValue={user.communeId ?? ""}
-                className="mt-2 h-9 rounded-md border border-border bg-white px-3 text-sm"
+                className="mt-2 h-9 w-full rounded-md border border-border bg-white px-3 text-sm"
               >
-                <option value="">Toutes les communes</option>
+                <option value="">Aucune (global)</option>
                 {communes.map((commune) => (
                   <option key={commune.id} value={commune.id}>
                     {commune.name}
@@ -93,6 +94,29 @@ export default async function AdminUserDetailsPage({ params }: { params: Promise
                 ))}
               </select>
             </label>
+            <div className="md:col-span-2">
+              <div className="text-sm font-medium text-slate-900">Communes accessibles (ADMIN)</div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Cochez les communes auxquelles cet admin peut accéder. Si aucune n&apos;est cochée, seule la commune principale est accessible.
+              </p>
+              <div className="mt-3 grid gap-2 md:grid-cols-3">
+                {communes.map((commune) => (
+                  <label
+                    key={commune.id}
+                    className="flex items-center gap-2 rounded-md border border-border bg-white px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      name="accessibleCommuneIds"
+                      value={commune.id}
+                      defaultChecked={accessibleCommuneIds.has(commune.id)}
+                      className="h-4 w-4"
+                    />
+                    <span>{commune.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <label className="text-sm font-medium text-slate-900">
               Superieur hierarchique
               <select

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getSession, getUserWithCommune } from "@/lib/auth";
+import { getSession, getSessionAccessibleCommunes } from "@/lib/auth";
 import Link from "next/link";
 import { Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -183,13 +183,21 @@ export default async function TaxpayersPage({
 }: {
   searchParams?: Promise<SearchParams>;
 }) {
-  const [session, user] = await Promise.all([getSession(), getUserWithCommune()]);
+  const [session, accessibleCommuneNames] = await Promise.all([
+    getSession(),
+    getSessionAccessibleCommunes(),
+  ]);
   const canDeleteTaxpayer = session?.role === "SUPER_ADMIN";
   const canDeleteNotice = session?.role === "SUPER_ADMIN" || session?.role === "ADMIN";
-  const scopedCommune = user?.role === "SUPER_ADMIN" ? null : user?.commune?.name ?? null;
+
+  // null = toutes les communes (SUPER_ADMIN), [] = aucune commune, [...] = liste de communes
+  const isUnrestricted = accessibleCommuneNames === null;
+
   const params = (await Promise.resolve(searchParams)) ?? {};
   const where: Record<string, any> = {};
-  const filterCommune = scopedCommune ? undefined : params.commune;
+  // Permettre le filtre par commune uniquement si l'utilisateur a accès à plusieurs communes ou est non restreint
+  const canFilterByCommune = isUnrestricted || (accessibleCommuneNames && accessibleCommuneNames.length > 1);
+  const filterCommune = canFilterByCommune ? params.commune : undefined;
   const activeStatus = params.status ?? "";
   const statusTabs = [
     { value: "", label: "Tous" },
@@ -221,9 +229,24 @@ export default async function TaxpayersPage({
   if (params.neighborhood) {
     where.neighborhood = { contains: params.neighborhood, mode: "insensitive" };
   }
-  if (scopedCommune) {
-    where.commune = scopedCommune;
+
+  // Filtrage par commune selon les droits d'accès
+  if (!isUnrestricted && accessibleCommuneNames && accessibleCommuneNames.length > 0) {
+    // Utilisateur avec communes restreintes
+    if (filterCommune) {
+      // Si un filtre commune est spécifié, vérifier qu'il fait partie des communes accessibles
+      if (accessibleCommuneNames.includes(filterCommune)) {
+        where.commune = { contains: filterCommune, mode: "insensitive" };
+      } else {
+        // Filtre non autorisé, utiliser les communes accessibles
+        where.commune = { in: accessibleCommuneNames };
+      }
+    } else {
+      // Pas de filtre, utiliser toutes les communes accessibles
+      where.commune = { in: accessibleCommuneNames };
+    }
   } else if (filterCommune) {
+    // SUPER_ADMIN avec filtre spécifique
     where.commune = { contains: filterCommune, mode: "insensitive" };
   }
   if (params.status) {
@@ -236,15 +259,26 @@ export default async function TaxpayersPage({
     where.groupId = params.groupId;
   }
 
+  // Construire les clauses de filtre pour les options basées sur les communes accessibles
+  const communeWhereClause = !isUnrestricted && accessibleCommuneNames && accessibleCommuneNames.length > 0
+    ? { name: { in: accessibleCommuneNames } }
+    : undefined;
+  const neighborhoodWhereClause = !isUnrestricted && accessibleCommuneNames && accessibleCommuneNames.length > 0
+    ? { commune: { name: { in: accessibleCommuneNames } } }
+    : undefined;
+  const groupWhereClause = !isUnrestricted && accessibleCommuneNames && accessibleCommuneNames.length > 0
+    ? { OR: [{ isGlobal: true }, { communes: { some: { name: { in: accessibleCommuneNames } } } }] }
+    : undefined;
+
   const [communeOptions, neighborhoodOptions, categoryOptions, groupOptions] = await Promise.all([
     prisma.commune.findMany({
       select: { id: true, name: true },
-      where: scopedCommune ? { name: scopedCommune } : undefined,
+      where: communeWhereClause,
       orderBy: { name: "asc" },
     }),
     prisma.neighborhood.findMany({
       select: { id: true, name: true, commune: { select: { name: true } } },
-      where: scopedCommune ? { commune: { name: scopedCommune } } : undefined,
+      where: neighborhoodWhereClause,
       orderBy: { name: "asc" },
     }),
     prisma.taxpayerCategory.findMany({
@@ -253,20 +287,23 @@ export default async function TaxpayersPage({
     }),
     prisma.taxpayerGroup.findMany({
       select: { id: true, name: true, isGlobal: true, communes: { select: { id: true, name: true } } },
-      where: scopedCommune
-        ? {
-            OR: [{ isGlobal: true }, { communes: { some: { name: scopedCommune } } }],
-          }
-        : undefined,
+      where: groupWhereClause,
       orderBy: { name: "asc" },
     }),
   ]);
   const groupLabelById = new Map(groupOptions.map((group) => [group.id, group.name]));
+
+  // Afficher les communes accessibles dans les filtres actifs si restreint
+  const communeFilterLabel = !isUnrestricted && accessibleCommuneNames && accessibleCommuneNames.length === 1
+    ? `Commune: ${accessibleCommuneNames[0]}`
+    : filterCommune
+      ? `Commune: ${filterCommune}`
+      : null;
+
   const activeFilters = [
     params.q ? `Recherche: ${params.q}` : null,
     params.neighborhood ? `Quartier: ${params.neighborhood}` : null,
-    scopedCommune ? `Commune: ${scopedCommune}` : null,
-    filterCommune ? `Commune: ${filterCommune}` : null,
+    communeFilterLabel,
     params.category ? `Catégorie: ${params.category}` : null,
     params.groupId ? `Groupe: ${groupLabelById.get(params.groupId) ?? params.groupId}` : null,
     params.status ? `Statut: ${TAXPAYER_STATUS_LABELS[params.status] ?? params.status}` : null,
@@ -357,6 +394,17 @@ export default async function TaxpayersPage({
     paymentHistoryByTaxpayer.set(taxpayerId, existing);
   }
 
+  type ReductionWithRelations = {
+    id: string;
+    taxpayerId: string;
+    amount: unknown;
+    previousTotal: unknown;
+    newTotal: unknown;
+    reason: string | null;
+    createdAt: Date;
+    notice: { number: string; year: number };
+    createdBy: { name: string | null; email: string } | null;
+  };
   const reductions = await prisma.noticeReduction.findMany({
     where: { taxpayerId: { in: taxpayerIds }, status: "APPROVED" },
     include: {
@@ -365,7 +413,7 @@ export default async function TaxpayersPage({
     },
     orderBy: { createdAt: "desc" },
     take: 500,
-  });
+  }) as unknown as ReductionWithRelations[];
   const reductionsByTaxpayer = new Map<string, TaxpayerModalData["reductions"]>();
   for (const reduction of reductions) {
     const existing = reductionsByTaxpayer.get(reduction.taxpayerId) ?? [];
@@ -435,7 +483,7 @@ export default async function TaxpayersPage({
             })}
           </div>
           <TaxpayerFilters
-            scopedCommune={scopedCommune}
+            accessibleCommunes={accessibleCommuneNames}
             communeOptions={communeOptions}
             neighborhoodOptions={neighborhoodOptions.map((item) => ({
               id: item.id,

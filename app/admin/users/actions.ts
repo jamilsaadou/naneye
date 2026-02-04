@@ -97,6 +97,10 @@ export async function updateUser(formData: FormData) {
     .getAll("modules")
     .map((value) => String(value))
     .filter((value): value is typeof MODULE_IDS[number] => MODULE_IDS.includes(value as typeof MODULE_IDS[number]));
+  const accessibleCommuneIds = formData
+    .getAll("accessibleCommuneIds")
+    .map((value) => String(value))
+    .filter(Boolean);
   const parsed = updateUserSchema.safeParse({
     email: raw.email ?? "",
     name: raw.name || null,
@@ -109,8 +113,15 @@ export async function updateUser(formData: FormData) {
   if (!parsed.success) {
     throw new Error("Données invalides");
   }
-  if (parsed.data.role !== "SUPER_ADMIN" && !parsed.data.communeId) {
+
+  // SUPER_ADMIN et ADMIN peuvent ne pas avoir de commune principale
+  // ADMIN doit avoir au moins une commune accessible ou une commune principale
+  const hasCommune = parsed.data.communeId || accessibleCommuneIds.length > 0;
+  if (parsed.data.role !== "SUPER_ADMIN" && parsed.data.role !== "ADMIN" && !parsed.data.communeId) {
     throw new Error("Commune obligatoire pour ce role");
+  }
+  if (parsed.data.role === "ADMIN" && !hasCommune) {
+    throw new Error("Un admin doit avoir au moins une commune accessible");
   }
 
   if (parsed.data.supervisorId) {
@@ -127,12 +138,9 @@ export async function updateUser(formData: FormData) {
     if (supervisor.role !== "SUPER_ADMIN" && supervisor.role !== "ADMIN") {
       throw new Error("Superieur hierarchique invalide");
     }
-    if (parsed.data.communeId) {
-      if (supervisor.communeId && supervisor.communeId !== parsed.data.communeId) {
-        throw new Error("Le superieur doit etre dans la meme commune ou global");
-      }
-    } else if (supervisor.communeId) {
-      throw new Error("Le superieur doit etre global pour un compte global");
+    // Validation simplifiée pour les admins avec communes accessibles
+    if (parsed.data.communeId && supervisor.communeId && supervisor.communeId !== parsed.data.communeId) {
+      throw new Error("Le superieur doit etre dans la meme commune ou global");
     }
   }
 
@@ -153,6 +161,9 @@ export async function updateUser(formData: FormData) {
       enabledModules: modules,
       communeId: parsed.data.communeId,
       supervisorId: parsed.data.supervisorId,
+      accessibleCommunes: {
+        set: accessibleCommuneIds.map((communeId) => ({ id: communeId })),
+      },
       ...(passwordHash ? { passwordHash } : {}),
     },
   });
